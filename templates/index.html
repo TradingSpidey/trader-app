@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>即日鮮研究室（模擬交易）</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>即日鮮研究室</h1>
+  <p class="sub">用開源 day-trader-skill 工具，睇吓一隻美股今日有冇「開市區間突破」訊號，再模擬 10,000 次結果。</p>
+  <div class="disclaimer"><b>只係研究同學習用，唔係投資建議。</b>全部係模擬交易（paper），呢個 app 冇連任何券商，唔會落真單。即日鮮大部分人長遠都係蝕錢。</div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="trade" class="active">分析一隻股</button>
+  <button data-tab="scan">掃描市場</button>
+  <button data-tab="analyst">業績</button>
+  <button data-tab="pelosi">議員交易</button>
+</nav>
+
+<main>
+<section id="tab-trade" class="tab active">
+  <div class="card form">
+    <label>美股代號<input id="ticker" value="TSLA" autocapitalize="characters" autocomplete="off"></label>
+    <label>戶口金額（美元）<input id="budget" value="5000" inputmode="decimal"></label>
+    <label>每單最多蝕（美元）<input id="maxloss" value="50" inputmode="decimal"></label>
+    <label>重播時間（紐約，選填）<input id="rtime" placeholder="自動" inputmode="numeric"></label>
+    <p class="hint" id="sessionhint">讀緊市場時間…</p>
+    <button id="run" class="primary">一鍵分析</button>
+  </div>
+  <div id="trade-out"></div>
+</section>
+
+<section id="tab-scan" class="tab">
+  <div class="card form">
+    <p>掃描約 100 隻成交最大嘅美股（全市場要幾分鐘，所以預設限咗數量）。撳結果入面嘅股票，就會自動填入「分析一隻股」。</p>
+    <div class="row">
+      <select id="scanmode">
+        <option value="orb">開市區間突破（即日）</option>
+        <option value="daily">日線形態（開市前）</option>
+      </select>
+      <button id="scanbtn" class="primary">開始掃描</button>
+    </div>
+  </div>
+  <div id="scan-out"></div>
+</section>
+
+<section id="tab-analyst" class="tab">
+  <div class="card form">
+    <p>由美國證監會（SEC）公開財報讀最近幾季收入、利潤率同增長。</p>
+    <div class="row"><input id="an-ticker" value="TSLA" autocapitalize="characters"><button id="anbtn" class="primary">讀業績</button></div>
+    {% if not sec %}<p class="err">伺服器未設定 SEC_USER_AGENT，呢個功能暫時用唔到。</p>{% endif %}
+  </div>
+  <div id="an-out"></div>
+</section>
+
+<section id="tab-pelosi" class="tab">
+  <div class="card form">
+    <p>讀美國眾議院議員嘅公開股票交易申報（法例容許交易後 45 日先申報，所以係舊消息，唔係內幕）。</p>
+    <div class="row"><input id="member" value="pelosi"><button id="ptrbtn" class="primary">搵申報</button></div>
+  </div>
+  <div id="ptr-out"></div>
+</section>
+</main>
+
+<footer>
+  數據：Yahoo Finance（免費、非官方、會延遲）、Nasdaq Trader、SEC EDGAR、美國眾議院 Clerk。工具：<a href="https://github.com/Jakeschincariol/day-trader-skill" target="_blank" rel="noopener">day-trader-skill</a>（MIT）。
+  唔係投資建議。模擬結果冇計滑價同手續費。
+</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
