@@ -40,6 +40,20 @@ def _load_scan():
 
 
 _scan = _load_scan()
+_entry = None
+
+
+def _load_entry():
+    """The same Yahoo chart reader trader-entry uses. Loaded once, stdlib only."""
+    global _entry
+    if _entry is None:
+        path = os.path.join(SKILLS, "trader-entry", "entry.py")
+        spec = importlib.util.spec_from_file_location("dts_entry", path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["dts_entry"] = mod
+        spec.loader.exec_module(mod)
+        _entry = mod
+    return _entry
 
 
 class RunError(Exception):
@@ -144,13 +158,14 @@ def _cacheable(val):
     return all(s.get("ok") for s in (val.get("steps") or {}).values())
 
 
-def _cached(key, fn):
+def _cached(key, fn, keep=None):
     with _lock:
         hit = _cache.get(key)
         if hit and time.time() - hit[0] < TTL:
             return dict(hit[1], cached=True)
     val = fn()
-    if not _cacheable(val):   # never cache a failure: the next try gets a fresh fetch
+    ok = _cacheable(val) if keep is None else keep(val)
+    if not ok:   # never cache a failure: the next try gets a fresh fetch
         return val
     with _lock:
         _cache[key] = (time.time(), val)
@@ -251,6 +266,53 @@ def _pipeline(ticker, budget, max_loss, sess):
         return out
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+def _px(x):
+    return None if x is None else round(float(x), 4)
+
+
+def _bars(ticker, sess):
+    """Closed 5-minute regular-session bars up to the same New York clock as the pipeline."""
+    entry = _load_entry()
+    day = datetime.date.fromisoformat(sess["day"])
+    try:
+        chart = entry.get_chart(ticker, "5m", day, None, ny_now().date())
+    except entry.EntryError as e:
+        raise RunError("讀唔到 K 線：%s" % e)
+    bounds = entry.session(day)
+    meta = chart.get("meta") or {}
+    out = {"ticker": ticker, "interval": "5m", "session": sess, "source": "yahoo",
+           "prev_close": _px(chart.get("prev_close")), "currency": meta.get("currency"),
+           "bars": [], "cached": False}
+    if not bounds:
+        return out
+    open_t, close_t = bounds
+    open_dt = datetime.datetime.combine(day, open_t)
+    close_dt = datetime.datetime.combine(day, close_t)
+    cutoff = datetime.datetime.strptime(sess["now_arg"], "%Y-%m-%d %H:%M")
+    step = entry.INTERVALS["5m"]
+    seen = {}
+    for b in chart["bars"]:
+        if b["t"] % step:
+            continue
+        et = entry.to_eastern(entry.utc_of(b["t"]))
+        if et.date() != day or not (open_dt <= et < close_dt):
+            continue
+        if et + datetime.timedelta(seconds=step) > cutoff:
+            continue
+        seen[int(b["t"])] = {"t": int(b["t"]), "time": et.strftime("%H:%M"),
+                             "o": _px(b["o"]), "h": _px(b["h"]), "l": _px(b["l"]), "c": _px(b["c"]),
+                             "v": int(b["v"] or 0)}
+    out["bars"] = [seen[k] for k in sorted(seen)]
+    return out
+
+
+def run_bars(ticker, hhmm=None):
+    ticker = validate_ticker(ticker)
+    sess = pick_session(hhmm)
+    key = ("bars", ticker, sess["now_arg"])
+    return _cached(key, lambda: _bars(ticker, sess), keep=lambda v: bool(v.get("bars")))
 
 
 def run_scan(mode="orb", hhmm=None):

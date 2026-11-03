@@ -46,6 +46,11 @@ def api_run():
                                                _num("max_loss", 50.0), request.args.get("time") or None))
 
 
+@app.get("/api/bars")
+def api_bars():
+    return _wrap(lambda: pipeline.run_bars(request.args.get("ticker", ""), request.args.get("time") or None))
+
+
 @app.get("/api/scan")
 def api_scan():
     return _wrap(lambda: pipeline.run_scan(request.args.get("mode", "orb"), request.args.get("time") or None))
@@ -69,6 +74,11 @@ def api_ptr():
 @app.get("/healthz")
 def healthz():
     return "ok"
+
+
+@app.get("/favicon.ico")
+def favicon():
+    return "", 204
 
 
 if __name__ == "__main__":

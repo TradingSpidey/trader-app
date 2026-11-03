@@ -18,7 +18,9 @@ ticket with `trader-broker/ticket.py show`, which contains no network code.
 
 When the US market is closed, the app replays the latest completed session at 10:15 AM New York
 time (or the time you type, 09:50–15:30) using the tools' `--now` option. While the market is open
-it uses the current (delayed) bars.
+it uses the current (delayed) bars. `/api/bars` returns that same session's closed 5-minute bars
+for the chart. Price lines and the Monte Carlo histogram are drawn only from fields the pipeline
+actually returns.
 
 Each run happens in its own temporary folder, so no state is shared between users. Identical
 requests are cached for 10 minutes to be polite to the free data sources.
@@ -40,7 +42,7 @@ docker build -t trader-app . && docker run -p 8080:8080 -e SEC_USER_AGENT="Your 
 ## Layout
 
 ```
-app.py                      Flask routes (/api/run, /api/scan, /api/analyst, /api/pelosi, /api/ptr)
+app.py                      Flask routes (/api/run, /api/bars, /api/scan, /api/analyst, /api/pelosi, /api/ptr, /healthz)
 traderapp/pipeline.py       runs the vendored tools as subprocesses, validates input, caches
 templates/ static/          the UI (vanilla JS, no build step)
 vendor/day-trader-skill/    upstream tools (MIT, commit in UPSTREAM_COMMIT; tests folder removed)

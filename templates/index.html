@@ -2,73 +2,103 @@
 <html lang="zh-Hant-HK">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
 <title>即日鮮研究室（模擬交易）</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2307080a'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-size='18' fill='%232fce85' font-family='sans-serif'%3E即%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header>
-  <h1>即日鮮研究室</h1>
-  <p class="sub">用開源 day-trader-skill 工具，睇吓一隻美股今日有冇「開市區間突破」訊號，再模擬 10,000 次結果。</p>
-  <div class="disclaimer"><b>只係研究同學習用，唔係投資建議。</b>全部係模擬交易（paper），呢個 app 冇連任何券商，唔會落真單。即日鮮大部分人長遠都係蝕錢。</div>
+<div class="app">
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">即</span>
+    <div>
+      <h1>即日鮮研究室</h1>
+      <p class="subname">開市區間突破 · 模擬研究</p>
+    </div>
+  </div>
+  <span class="badge">模擬交易</span>
+  <div class="session" id="sessionchip"><span class="dot" id="sessiondot"></span><span id="sessionshort">讀緊市場時間…</span></div>
 </header>
 
-<nav class="tabs">
-  <button data-tab="trade" class="active">分析一隻股</button>
-  <button data-tab="scan">掃描市場</button>
-  <button data-tab="analyst">業績</button>
-  <button data-tab="pelosi">議員交易</button>
+<div class="disclaimer" role="note"><b>只係研究同學習用，唔係投資建議。</b>全部係模擬交易（paper），呢個 app 冇連任何券商，唔會落真單。即日鮮大部分人長遠都係蝕錢。</div>
+
+<div class="shell">
+<nav class="sidebar" aria-label="功能">
+  <button type="button" data-tab="trade" class="active" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+    <span>分析一隻股</span>
+  </button>
+  <button type="button" data-tab="scan">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h16"/><path d="M8 5v0M8 12v0M8 19v0"/></svg>
+    <span>掃描市場</span>
+  </button>
+  <button type="button" data-tab="analyst">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V10M10 19V5M15 19v-7M20 19V8"/></svg>
+    <span>業績</span>
+  </button>
+  <button type="button" data-tab="pelosi">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M9 12h6M9 16h6"/></svg>
+    <span>議員交易</span>
+  </button>
 </nav>
 
 <main>
 <section id="tab-trade" class="tab active">
-  <div class="card form">
-    <label>美股代號<input id="ticker" value="TSLA" autocapitalize="characters" autocomplete="off"></label>
-    <label>戶口金額（美元）<input id="budget" value="5000" inputmode="decimal"></label>
-    <label>每單最多蝕（美元）<input id="maxloss" value="50" inputmode="decimal"></label>
-    <label>重播時間（紐約，選填）<input id="rtime" placeholder="自動" inputmode="numeric"></label>
+  <div class="card controls">
+    <label>美股代號<input id="ticker" value="TSLA" autocapitalize="characters" autocomplete="off" spellcheck="false"></label>
+    <label>戶口金額（美元）<input id="budget" value="5000" inputmode="decimal" autocomplete="off"></label>
+    <label>每單最多蝕（美元）<input id="maxloss" value="50" inputmode="decimal" autocomplete="off"></label>
+    <label>重播時間（紐約，選填）<input id="rtime" placeholder="自動" inputmode="numeric" autocomplete="off"></label>
+    <button type="button" id="run" class="primary">一鍵分析</button>
     <p class="hint" id="sessionhint">讀緊市場時間…</p>
-    <button id="run" class="primary">一鍵分析</button>
   </div>
   <div id="trade-out"></div>
 </section>
 
 <section id="tab-scan" class="tab">
-  <div class="card form">
+  <div class="card controls scan-controls">
     <p>掃描約 100 隻成交最大嘅美股（全市場要幾分鐘，所以預設限咗數量）。撳結果入面嘅股票，就會自動填入「分析一隻股」。</p>
     <div class="row">
       <select id="scanmode">
         <option value="orb">開市區間突破（即日）</option>
         <option value="daily">日線形態（開市前）</option>
       </select>
-      <button id="scanbtn" class="primary">開始掃描</button>
+      <button type="button" id="scanbtn" class="primary">開始掃描</button>
     </div>
   </div>
   <div id="scan-out"></div>
 </section>
 
 <section id="tab-analyst" class="tab">
-  <div class="card form">
+  <div class="card controls an-controls">
     <p>由美國證監會（SEC）公開財報讀最近幾季收入、利潤率同增長。</p>
-    <div class="row"><input id="an-ticker" value="TSLA" autocapitalize="characters"><button id="anbtn" class="primary">讀業績</button></div>
+    <div class="row"><input id="an-ticker" value="TSLA" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="業績股票代號"><button type="button" id="anbtn" class="primary">讀業績</button></div>
     {% if not sec %}<p class="err">伺服器未設定 SEC_USER_AGENT，呢個功能暫時用唔到。</p>{% endif %}
   </div>
   <div id="an-out"></div>
 </section>
 
 <section id="tab-pelosi" class="tab">
-  <div class="card form">
+  <div class="card controls ptr-controls">
     <p>讀美國眾議院議員嘅公開股票交易申報（法例容許交易後 45 日先申報，所以係舊消息，唔係內幕）。</p>
-    <div class="row"><input id="member" value="pelosi"><button id="ptrbtn" class="primary">搵申報</button></div>
+    <div class="row"><input id="member" value="pelosi" autocomplete="off" aria-label="議員姓名"><button type="button" id="ptrbtn" class="primary">搵申報</button></div>
   </div>
   <div id="ptr-out"></div>
 </section>
 </main>
+</div>
 
 <footer>
   數據：Yahoo Finance（免費、非官方、會延遲）、Nasdaq Trader、SEC EDGAR、美國眾議院 Clerk。工具：<a href="https://github.com/Jakeschincariol/day-trader-skill" target="_blank" rel="noopener">day-trader-skill</a>（MIT）。
   唔係投資建議。模擬結果冇計滑價同手續費。
 </footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
