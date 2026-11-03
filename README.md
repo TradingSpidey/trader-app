@@ -15,6 +15,7 @@ ticket with `trader-broker/ticket.py show`, which contains no network code.
 | 掃描市場 | opening-range breakout or daily-pattern scan over ~100 liquid US names; click a hit to analyse it |
 | 業績 | SEC XBRL quarterly revenue, margins, growth (needs `SEC_USER_AGENT`) |
 | 議員交易 | House Clerk periodic transaction reports for a member (default Pelosi); reads the PDF with `pdftotext` |
+| SPIDEY 交易台 (`/desk`) | eight paper desks on live Solana pool data (GeckoTerminal + DexScreener). No wallet, no orders. The book is in memory and resets when the process sleeps |
 
 When the US market is closed, the app replays the latest completed session at 10:15 AM New York
 time (or the time you type, 09:50–15:30) using the tools' `--now` option. While the market is open
@@ -42,7 +43,7 @@ docker build -t trader-app . && docker run -p 8080:8080 -e SEC_USER_AGENT="Your 
 ## Layout
 
 ```
-app.py                      Flask routes (/api/run, /api/bars, /api/scan, /api/analyst, /api/pelosi, /api/ptr, /healthz)
+app.py                      Flask routes (/api/run, /api/bars, /api/scan, /api/analyst, /api/pelosi, /api/ptr, /api/desk/*, /healthz)
 traderapp/pipeline.py       runs the vendored tools as subprocesses, validates input, caches
 templates/ static/          the UI (vanilla JS, no build step)
 vendor/day-trader-skill/    upstream tools (MIT, commit in UPSTREAM_COMMIT; tests folder removed)

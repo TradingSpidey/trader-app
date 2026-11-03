@@ -84,6 +84,14 @@ a { color: #c5d4e4; }
 .sidebar button svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .sidebar button.active { background: #121a16; color: var(--text); border-color: #1f7a4d; }
 .sidebar button:hover { color: var(--text); }
+a.desk-link {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 36px;
+  padding: 6px 12px; border: 1px solid #2ee6c7; color: #d7fff6; text-decoration: none;
+  border-radius: 4px; font-weight: 700; letter-spacing: .04em; background: #0d2422;
+  white-space: nowrap;
+}
+a.desk-link:hover { background: #14332f; }
+.sidebar a.desk-link { width: 100%; margin-bottom: 6px; min-height: 44px; }
 main { flex: 1; min-width: 0; padding: 14px 16px 28px; }
 footer {
   width: min(1280px, 100%); margin: 0 auto; padding: 8px 16px 28px;
@@ -222,7 +230,7 @@ svg text { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
     flex-direction: row; gap: 0; padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
     background: #0c0f13; border-right: 0; border-top: 1px solid var(--line); z-index: 40;
   }
-  .sidebar button { flex: 1; flex-direction: column; gap: 2px; justify-content: center; font-size: 11px; padding: 6px 2px; min-height: 52px; }
+  .sidebar button, .sidebar a.desk-link { flex: 1; flex-direction: column; gap: 2px; justify-content: center; font-size: 11px; padding: 6px 2px; min-height: 52px; margin: 0; }
   .controls { grid-template-columns: 1fr 1fr; }
   .controls button.primary { grid-column: 1 / -1; }
   .kpis { grid-template-columns: 1fr 1fr; }

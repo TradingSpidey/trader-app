@@ -5,7 +5,7 @@ import sys
 from flask import Flask, jsonify, render_template, request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from traderapp import pipeline  # noqa: E402
+from traderapp import desk, pipeline  # noqa: E402
 
 app = Flask(__name__)
 
@@ -69,6 +69,36 @@ def api_pelosi():
 @app.get("/api/ptr")
 def api_ptr():
     return _wrap(lambda: pipeline.run_ptr_fetch(request.args.get("doc", ""), request.args.get("year")))
+
+
+@app.get("/desk")
+def desk_page():
+    return render_template("desk.html")
+
+
+@app.get("/api/desk/state")
+def api_desk_state():
+    return _wrap(desk.snapshot)
+
+
+@app.get("/api/desk/log")
+def api_desk_log():
+    return _wrap(desk.log_view)
+
+
+@app.post("/api/desk/kill")
+def api_desk_kill():
+    body = request.get_json(silent=True) or {}
+    if "on" in body:
+        on = bool(body.get("on"))
+    else:
+        on = (request.args.get("on") or "1").strip().lower() not in ("0", "false", "off")
+    return _wrap(lambda: desk.set_kill(on))
+
+
+@app.post("/api/desk/reset")
+def api_desk_reset():
+    return _wrap(desk.reset)
 
 
 @app.get("/healthz")
