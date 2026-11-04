@@ -28,6 +28,15 @@ python -m traderapp.desk_runner --market crypto --state-dir /var/spidey/crypto -
 
 `--start-usd` is used only when `state.json` does not exist yet (stocks). The default web starting cash is `$DESK_STOCK_START_USD` or $10,000. Each loop writes `state.json`, and appends `trades.csv` and `equity.csv`. Restarting reloads `state.json`. US stocks open new paper trades only during the New York regular session (09:30–16:00), which is 22:30–05:00 Hong Kong time while the US is on standard time. No wallet, no orders.
 
+The always-on machine can publish its two $50 books to the site (this is separate from the in-browser demo book, which resets when Render sleeps):
+
+```bash
+curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: application/json" \
+  --data-binary @crypto.json https://<host>/api/paper/ingest/crypto
+```
+
+`stocks` is the other book name. The page is `/paper`. If `PAPER_INGEST_TOKEN` is unset the ingest endpoint returns 503.
+
 When the US market is closed, the app replays the latest completed session at 10:15 AM New York
 time (or the time you type, 09:50–15:30) using the tools' `--now` option. While the market is open
 it uses the current (delayed) bars. `/api/bars` returns that same session's closed 5-minute bars

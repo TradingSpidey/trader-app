@@ -81,6 +81,12 @@ function money(v, sign) {
   }
   return sol(v, sign);
 }
+function winText(a) {
+  const n = a.closed == null || a.closed === "" ? null : Number(a.closed);
+  if (n != null && !Number.isNaN(n) && n < 5) return "樣本太少（已平倉 " + n + " 單）";
+  if (a.win_rate == null) return a.win_rate_text || "未有已平倉交易";
+  return (Number(a.win_rate) * 100).toFixed(1) + "%";
+}
 function pnlOf(b) { return market === "stocks" ? b.paper_pnl : b.paper_pnl_sol; }
 function upOf(p) { return p.upnl_usd != null ? p.upnl_usd : p.upnl_sol; }
 
@@ -188,7 +194,7 @@ function render(j) {
   const eq = market === "stocks" ? a.equity_usd : a.equity_sol;
   $("#stats").innerHTML = `
     <div class="stat"><span>今日模擬盈虧</span><b class="num ${cls(pnl)}">${a.quote_missing ? "—" : money(pnl, true)}</b></div>
-    <div class="stat"><span>勝率（已平倉）</span><b class="num">${a.win_rate == null ? esc(a.win_rate_text || "未有已平倉交易") : (a.win_rate * 100).toFixed(1) + "%"}</b></div>
+    <div class="stat"><span>勝率（已平倉）</span><b class="num">${esc(winText(a))}</b></div>
     <div class="stat"><span>模擬權益</span><b class="num">${money(eq, false)}</b></div>
     <div class="stat"><span>${market === "stocks" ? "現金" : "SOL 報價"}</span><b class="num">${market === "stocks" ? money(a.cash_usd, false) : usd(j.sol_usd)}</b></div>`;
   const kill = $("#kill");
@@ -202,6 +208,8 @@ function render(j) {
   const healthNames = {geckoterminal:"GeckoTerminal", dexscreener:"DexScreener", solana_rpc:"Solana RPC", yahoo:"Yahoo", house:"眾議院"};
   $("#health").innerHTML = Object.keys(health).map((k) => `<span class="hp ${hcls(health[k])}">${esc(healthNames[k] || k)} ${esc(health[k] || "未查")}</span>`).join("");
   $("#kicker").textContent = market === "stocks" ? "美股 · Yahoo" : "SOLANA · 公開行情";
+  const demo = $("#demo-note");
+  if (demo) demo.textContent = market === "stocks" ? "網站示範盤（預設 $10,000，Render 休眠會重置）" : "網站示範盤（10 SOL，Render 休眠會重置）";
   $("#m-crypto").classList.toggle("on", market !== "stocks");
   $("#m-stocks").classList.toggle("on", market === "stocks");
   const sess = j.session;

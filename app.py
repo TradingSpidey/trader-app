@@ -1,11 +1,12 @@
 """Trader 研究室: a small web front end for the day-trader-skill tools. Paper trading only."""
+import hmac
 import os
 import sys
 
 from flask import Flask, jsonify, render_template, request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from traderapp import desk, desk_stocks, pipeline  # noqa: E402
+from traderapp import desk, desk_stocks, paper_store, pipeline  # noqa: E402
 
 app = Flask(__name__)
 
@@ -124,6 +125,38 @@ def api_desk_stocks_kill():
 @app.post("/api/desk/stocks/reset")
 def api_desk_stocks_reset():
     return _wrap(desk_stocks.reset)
+
+
+def _bearer():
+    header = request.headers.get("Authorization") or ""
+    if not header.startswith("Bearer "):
+        return ""
+    return header[7:].strip()
+
+
+@app.post("/api/paper/ingest/<book>")
+def api_paper_ingest(book):
+    token = os.environ.get("PAPER_INGEST_TOKEN") or ""
+    if not token:
+        return jsonify({"error": "未設定接收權杖"}), 503
+    got = _bearer()
+    if not got or not hmac.compare_digest(got, token):
+        return jsonify({"error": "未授權"}), 401
+    if request.content_length is not None and request.content_length > paper_store.MAX_BODY:
+        return jsonify({"error": "內容太大"}), 400
+    raw = request.get_data(cache=False) or b""
+    body, code = paper_store.ingest(book, raw)
+    return jsonify(body), code
+
+
+@app.get("/api/paper")
+def api_paper():
+    return jsonify(paper_store.load_all())
+
+
+@app.get("/paper")
+def paper_page():
+    return render_template("paper.html")
 
 
 @app.get("/healthz")

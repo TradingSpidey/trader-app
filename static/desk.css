@@ -43,6 +43,7 @@ button, a { font: inherit; color: inherit; }
   color: var(--cyan); min-height: 40px; display: inline-flex; align-items: center;
 }
 .kicker { margin: 0; color: var(--cyan); letter-spacing: .16em; font-size: 11px; font-family: var(--display); }
+.demo-note { margin: 2px 0 0; color: var(--amber); font-size: 12px; }
 h1 { margin: 0; font-family: var(--display); font-size: 26px; letter-spacing: .04em; font-weight: 700; }
 h2 { margin: 0; font-size: 15px; font-weight: 700; }
 .stats { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
