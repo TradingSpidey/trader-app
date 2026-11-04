@@ -28,6 +28,7 @@
     <div class="stat"><span>模擬權益</span><b class="num">—</b></div>
   </div>
   <div class="actions">
+    <div class="health" id="health" aria-label="數據源狀態"></div>
     <button type="button" id="kill" class="ghost">風控停止</button>
     <button type="button" id="reset" class="ghost">重置模擬倉</button>
   </div>
@@ -36,6 +37,7 @@
 <div class="tape-wrap" aria-label="行情走馬燈">
   <span class="tag live">即時行情</span>
   <div class="tape" id="tape"><span class="muted">讀緊公開行情…</span></div>
+  <span class="tag" id="tape-age"></span>
 </div>
 <div class="layout">
   <div class="floor">

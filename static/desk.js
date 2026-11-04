@@ -74,7 +74,7 @@ function render(j) {
   const pnl = a.day_pnl_sol;
   $("#stats").innerHTML = `
     <div class="stat"><span>今日模擬盈虧</span><b class="num ${cls(pnl)}">${a.quote_missing ? "—" : sol(pnl, true)}</b></div>
-    <div class="stat"><span>勝率（已平倉）</span><b class="num">${a.win_rate == null ? "—" : (a.win_rate * 100).toFixed(1) + "%"}</b></div>
+    <div class="stat"><span>勝率（已平倉）</span><b class="num">${a.win_rate == null ? esc(a.win_rate_text || "未有已平倉交易") : (a.win_rate * 100).toFixed(1) + "%"}</b></div>
     <div class="stat"><span>模擬權益</span><b class="num">${sol(a.equity_sol, false)}</b></div>
     <div class="stat"><span>SOL 報價</span><b class="num">${usd(j.sol_usd)}</b></div>`;
   const kill = $("#kill");
@@ -83,6 +83,14 @@ function render(j) {
   kill.dataset.on = a.kill ? "0" : "1";
 
   const tape = j.tape || [];
+  const health = j.health || {};
+  const hcls = (s) => s === "正常" ? "ok" : s === "限速中" ? "limit" : s === "未查" ? "" : "bad";
+  $("#health").innerHTML = [
+    ["GeckoTerminal", health.geckoterminal],
+    ["DexScreener", health.dexscreener],
+    ["Solana RPC", health.solana_rpc],
+  ].map(([name, state]) => `<span class="hp ${hcls(state)}">${esc(name)} ${esc(state || "未查")}</span>`).join("");
+  $("#tape-age").textContent = j.market_age_sec == null ? "" : "更新於 " + j.market_age_sec + " 秒前";
   $("#tape").innerHTML = tape.length ? tape.map((t) => `<span>${esc(t.symbol)} <b class="${cls(t.change_h1)}">${pct(t.change_h1)}</b></span>`).join("") : `<span class="muted">暫無熱門報價</span>`;
 
   const route = (j.chief && j.chief.route) || [];
@@ -102,6 +110,8 @@ function render(j) {
       <p class="detail">${esc(b.status)}。${esc(b.detail || "")}</p>
       <dl class="metrics">${(b.metrics || []).map(metric).join("")}</dl>
       ${spark(b.candles)}
+      ${b.candles_kind === "change" ? `<p class="muted">由公開升跌幅反推，唔係 K 線</p>` : ""}
+      ${(b.trades || []).length ? `<ul class="trades">${b.trades.map((t) => `<li>${esc(t.kind)} ${esc(usd(t.usd))} <a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.wallet_short)}</a></li>`).join("")}</ul>` : (b.trades_note ? `<p class="muted">${esc(b.trades_note)}</p>` : "")}
       <p class="pnl"><span class="tag paper">模擬</span> ${b.paper_pnl_sol == null ? "—" : `<b class="num ${cls(b.paper_pnl_sol)}">${sol(b.paper_pnl_sol, true)}</b>`} <span class="muted">${esc(b.paper_note || "")}</span></p>
     </article>`).join("");
 
