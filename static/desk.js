@@ -69,14 +69,128 @@ function spark(candles) {
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="公開 5 分鐘收市價"><path d="${line}" fill="none" stroke="${up ? "#3dffb0" : "#ff5d7a"}" stroke-width="2"/></svg>`;
 }
 
+let market = new URLSearchParams(location.search).get("market") === "stocks" ? "stocks" : "crypto";
+let lastAct = "";
+
+function money(v, sign) {
+  if (market === "stocks") {
+    if (v == null || Number.isNaN(Number(v))) return "—";
+    const n = Number(v);
+    const body = Math.abs(n).toLocaleString("en-US", {maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 2});
+    return (n < 0 ? "-$" : (sign && n > 0 ? "+$" : "$")) + body;
+  }
+  return sol(v, sign);
+}
+function pnlOf(b) { return market === "stocks" ? b.paper_pnl : b.paper_pnl_sol; }
+function upOf(p) { return p.upnl_usd != null ? p.upnl_usd : p.upnl_sol; }
+
+function person(id) {
+  const hair = {scan:"#3ee0ff",sniper:"#ffc14d",whale:"#7aa2ff",search:"#c58bff",rug:"#ff5d7a",exit:"#3dffb0",risk:"#ff9f43",dev:"#ff4d9a",chief:"#e8fbff"}[id] || "#3ee0ff";
+  const prop = id === "whale"
+    ? `<circle cx="12" cy="20" r="5" fill="none" stroke="${hair}" stroke-width="1.6"/><circle cx="42" cy="20" r="5" fill="none" stroke="${hair}" stroke-width="1.6"/><path d="M17 20h20" stroke="${hair}"/>`
+    : id === "rug"
+      ? `<path d="M40 26h10v12H40z" fill="none" stroke="${hair}" stroke-width="1.6"/>`
+      : id === "chief"
+        ? `<path d="M18 8h18" stroke="${hair}" stroke-width="2"/>`
+        : "";
+  return `<svg viewBox="0 0 54 70" class="person" aria-hidden="true">
+    <circle cx="27" cy="16" r="10" fill="#f3d2b6"/>
+    <path d="M16 14c2-10 20-10 22 0" fill="${hair}"/>
+    <rect class="arm" x="4" y="32" width="14" height="5" rx="2" fill="${hair}"/>
+    <rect class="arm" x="36" y="32" width="14" height="5" rx="2" fill="${hair}"/>
+    <rect x="17" y="28" width="20" height="24" rx="5" fill="#18283a" stroke="${hair}"/>
+    <rect x="20" y="52" width="5" height="14" rx="2" fill="#24384e"/>
+    <rect x="29" y="52" width="5" height="14" rx="2" fill="#24384e"/>
+    ${prop}
+  </svg>`;
+}
+
+const SPOTS = {scan:[16,28], sniper:[250,28], whale:[640,28], search:[880,28], chief:[445,188], rug:[16,340], exit:[250,340], risk:[640,340], dev:[880,340]};
+
+function bubble(b) {
+  const t = String(b.bubble || b.status || "").replace(/。/g, "");
+  return t.length > 26 ? t.slice(0, 26) + "…" : t;
+}
+function pose(b) {
+  if (b.id === "rug" && (b.tone === "block" || String(b.status).indexOf("擋") >= 0)) return "shield";
+  if (b.id === "whale") return "look";
+  if (b.tone === "idle") return "idle";
+  return "work";
+}
+function drawOffice(j) {
+  const bots = (j.bots || []).slice();
+  const chief = {id:"chief", en:"CHIEF", name:"主管", status:(j.chief && j.chief.status) || "值班", tone:"work", bubble:(j.chief && (j.chief.route || [])[0]) || "值班"};
+  const all = bots.concat([chief]);
+  $("#office").innerHTML = all.map((b) => {
+    const xy = SPOTS[b.id] || [40, 40];
+    const mini = (b.candles || []).slice(-12);
+    let line = "";
+    if (mini.length >= 2) {
+      const cs = mini.map((c) => c.c);
+      const lo = Math.min(...cs), hi = Math.max(...cs) || 1;
+      const span = hi - lo || 1;
+      line = cs.map((v, i) => `${i ? "L" : "M"}${(4 + i * 90 / (cs.length - 1)).toFixed(1)},${(28 - (v - lo) / span * 20).toFixed(1)}`).join("");
+    }
+    return `<button type="button" class="station" data-id="${esc(b.id)}" style="left:${xy[0]}px;top:${xy[1]}px;--c:${({scan:"#3ee0ff",sniper:"#ffc14d",whale:"#7aa2ff",search:"#c58bff",rug:"#ff5d7a",exit:"#3dffb0",risk:"#ff9f43",dev:"#ff4d9a",chief:"#e8fbff"})[b.id]}">
+      <div class="bubble">${esc(bubble(b))}</div>
+      ${person(b.id).replace('class="person"', `class="person ${pose(b)}"`)}
+      <div class="desklet">${line ? `<svg viewBox="0 0 100 32"><path d="${line}" fill="none" stroke="currentColor" stroke-width="2"/></svg>` : ""}</div>
+      <div class="label"><em>${esc(b.en || "")}</em>${esc(b.name || "主管")}</div>
+    </button>`;
+  }).join("");
+  $("#office").querySelectorAll(".station").forEach((el) => el.addEventListener("click", () => openDetail(j, el.dataset.id)));
+  maybeAct(j);
+}
+function openDetail(j, id) {
+  const b = (j.bots || []).find((x) => x.id === id) || (id === "chief" ? {name:"主管", status:(j.chief || {}).status, detail:((j.chief || {}).route || []).join(" → "), metrics:[]} : null);
+  const box = $("#detail");
+  if (!b) { box.hidden = true; return; }
+  box.hidden = false;
+  box.className = "detail-pop panel";
+  box.innerHTML = `<h2>${esc(b.name || "主管")}</h2><p>${esc(b.status || "")}</p><p class="muted">${esc(b.detail || "")}</p><dl class="metrics">${(b.metrics || []).map(metric).join("")}</dl><button type="button" id="detail-x">關閉</button>`;
+  $("#detail-x").addEventListener("click", () => { box.hidden = true; });
+}
+function maybeAct(j) {
+  const hit = (j.feed || []).find((f) => f.kind === "paper" && /模擬買入|止賺|止蝕/.test(f.text || ""));
+  if (!hit) return;
+  const key = (hit.ts || "") + (hit.text || "");
+  if (key === lastAct) return;
+  lastAct = key;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (/止賺/.test(hit.text)) flash("exit", "cheer");
+  else if (/止蝕/.test(hit.text)) flash("exit", "slump");
+  else handoff();
+}
+function flash(id, clsName) {
+  const svg = document.querySelector(`.station[data-id="${id}"] .person`);
+  if (!svg) return;
+  svg.classList.add(clsName);
+  setTimeout(() => svg.classList.remove(clsName), 4000);
+}
+function handoff() {
+  const order = ["sniper", "rug", "risk", "chief", "exit"];
+  let i = 0;
+  const step = () => {
+    document.querySelectorAll(".station").forEach((el) => el.classList.remove("to-chief"));
+    if (i >= order.length) return;
+    const el = document.querySelector(`.station[data-id="${order[i]}"]`);
+    if (el) el.classList.add("to-chief");
+    i += 1;
+    setTimeout(step, 1100);
+  };
+  step();
+}
+
 function render(j) {
+  market = j.market === "stocks" ? "stocks" : "crypto";
   const a = j.account || {};
-  const pnl = a.day_pnl_sol;
+  const pnl = market === "stocks" ? a.day_pnl_usd : a.day_pnl_sol;
+  const eq = market === "stocks" ? a.equity_usd : a.equity_sol;
   $("#stats").innerHTML = `
-    <div class="stat"><span>今日模擬盈虧</span><b class="num ${cls(pnl)}">${a.quote_missing ? "—" : sol(pnl, true)}</b></div>
+    <div class="stat"><span>今日模擬盈虧</span><b class="num ${cls(pnl)}">${a.quote_missing ? "—" : money(pnl, true)}</b></div>
     <div class="stat"><span>勝率（已平倉）</span><b class="num">${a.win_rate == null ? esc(a.win_rate_text || "未有已平倉交易") : (a.win_rate * 100).toFixed(1) + "%"}</b></div>
-    <div class="stat"><span>模擬權益</span><b class="num">${sol(a.equity_sol, false)}</b></div>
-    <div class="stat"><span>SOL 報價</span><b class="num">${usd(j.sol_usd)}</b></div>`;
+    <div class="stat"><span>模擬權益</span><b class="num">${money(eq, false)}</b></div>
+    <div class="stat"><span>${market === "stocks" ? "現金" : "SOL 報價"}</span><b class="num">${market === "stocks" ? money(a.cash_usd, false) : usd(j.sol_usd)}</b></div>`;
   const kill = $("#kill");
   kill.textContent = a.kill ? "解除停止" : "風控停止";
   kill.classList.toggle("danger", !a.kill);
@@ -85,11 +199,13 @@ function render(j) {
   const tape = j.tape || [];
   const health = j.health || {};
   const hcls = (s) => s === "正常" ? "ok" : s === "限速中" ? "limit" : s === "未查" ? "" : "bad";
-  $("#health").innerHTML = [
-    ["GeckoTerminal", health.geckoterminal],
-    ["DexScreener", health.dexscreener],
-    ["Solana RPC", health.solana_rpc],
-  ].map(([name, state]) => `<span class="hp ${hcls(state)}">${esc(name)} ${esc(state || "未查")}</span>`).join("");
+  const healthNames = {geckoterminal:"GeckoTerminal", dexscreener:"DexScreener", solana_rpc:"Solana RPC", yahoo:"Yahoo", house:"眾議院"};
+  $("#health").innerHTML = Object.keys(health).map((k) => `<span class="hp ${hcls(health[k])}">${esc(healthNames[k] || k)} ${esc(health[k] || "未查")}</span>`).join("");
+  $("#kicker").textContent = market === "stocks" ? "美股 · Yahoo" : "SOLANA · 公開行情";
+  $("#m-crypto").classList.toggle("on", market !== "stocks");
+  $("#m-stocks").classList.toggle("on", market === "stocks");
+  const sess = j.session;
+  $("#session-line").textContent = sess ? `美股${sess.phase} · 紐約 ${sess.et} · 香港 ${sess.hkt} · 正規 ${sess.hours_hkt}` : "";
   $("#tape-age").textContent = j.market_age_sec == null ? "" : "更新於 " + j.market_age_sec + " 秒前";
   $("#tape").innerHTML = tape.length ? tape.map((t) => `<span>${esc(t.symbol)} <b class="${cls(t.change_h1)}">${pct(t.change_h1)}</b></span>`).join("") : `<span class="muted">暫無熱門報價</span>`;
 
@@ -112,14 +228,14 @@ function render(j) {
       ${spark(b.candles)}
       ${b.candles_kind === "change" ? `<p class="muted">由公開升跌幅反推，唔係 K 線</p>` : ""}
       ${(b.trades || []).length ? `<ul class="trades">${b.trades.map((t) => `<li>${esc(t.kind)} ${esc(usd(t.usd))} <a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.wallet_short)}</a></li>`).join("")}</ul>` : (b.trades_note ? `<p class="muted">${esc(b.trades_note)}</p>` : "")}
-      <p class="pnl"><span class="tag paper">模擬</span> ${b.paper_pnl_sol == null ? "—" : `<b class="num ${cls(b.paper_pnl_sol)}">${sol(b.paper_pnl_sol, true)}</b>`} <span class="muted">${esc(b.paper_note || "")}</span></p>
+      <p class="pnl"><span class="tag paper">模擬</span> ${pnlOf(b) == null ? "—" : `<b class="num ${cls(pnlOf(b))}">${money(pnlOf(b), true)}</b>`} <span class="muted">${esc(b.paper_note || "")}</span></p>
     </article>`).join("");
 
   $("#roster").innerHTML = `<h2>值班表</h2>` + (j.bots || []).map((b) => `
     <div class="roster-row">
       <i class="dot ${esc(b.tone)}"></i>
       <div><b>${esc(b.name)}</b><div class="muted">${esc(b.status)}</div></div>
-      <div class="num ${cls(b.paper_pnl_sol)}">${b.paper_pnl_sol == null ? "—" : sol(b.paper_pnl_sol, true)}</div>
+      <div class="num ${cls(pnlOf(b))}">${pnlOf(b) == null ? "—" : money(pnlOf(b), true)}</div>
     </div>`).join("");
 
   const feed = j.feed || [];
@@ -131,34 +247,47 @@ function render(j) {
       <div><b>${esc(p.symbol)}</b><div class="muted">${esc(p.why || "")}</div></div>
       <div class="num">入 ${usd(p.entry_usd)}</div>
       <div class="num">而家 ${usd(p.last_usd)}</div>
-      <div class="num ${cls(p.upnl_sol)}">${p.upnl_sol == null ? "—" : sol(p.upnl_sol, true)}</div>
+      <div class="num ${cls(upOf(p))}">${upOf(p) == null ? "—" : money(upOf(p), true)}</div>
     </div>`).join("") : `<p class="muted">未有模擬倉。規則未過就唔會造數。</p>`);
 
   const radar = j.radar || [];
-  $("#radar").innerHTML = `<h2>新池雷達 <span class="tag live">即時行情</span></h2>` + (radar.length ? radar.map((r) => `
+  const radarHead = market === "stocks" ? "美股雷達" : "新池雷達";
+  $("#radar").innerHTML = `<h2>${radarHead} <span class="tag live">即時行情</span></h2>` + (radar.length ? radar.map((r) => market === "stocks" ? `
+    <div class="radar-row">
+      <div><b>${esc(r.symbol)}</b></div>
+      <div class="num ${cls(r.gap)}">${pct(r.gap)}</div>
+      <div class="num">${usd(r.price)}</div>
+      <div class="num">${r.rvol == null ? "—" : r.rvol + "x"}</div>
+    </div>` : `
     <div class="radar-row">
       <div><a class="ext" href="https://dexscreener.com/solana/${encodeURIComponent(r.mint || "")}" target="_blank" rel="noopener">${esc(r.symbol)}</a></div>
       <div class="num">${r.age_min == null ? "—" : r.age_min + " 分"}</div>
       <div class="num">${usd(r.liq_usd)}</div>
       <div class="num ${cls(r.change_h1)}">${pct(r.change_h1)}</div>
-    </div>`).join("") : `<p class="muted">暫無新池</p>`);
+    </div>`).join("") : `<p class="muted">暫無</p>`);
+  drawOffice(j);
 
   $("#rules").innerHTML = `<h2>規則</h2><ol>${(j.rules || []).map((r) => `<li>${esc(r)}</li>`).join("")}</ol>`;
   const err = (j.errors || []).join(" ");
   $("#foot").innerHTML = `行情來源：${esc((j.sources && j.sources.market || []).join("、"))}。盈虧係${esc(j.sources && j.sources.paper)}。SOL 報價來源：${esc(j.sol_source || "暫無數據")}。${err ? `<span class="err">${esc(err)}</span>` : ""}`;
 }
 
+function api(path) {
+  return market === "stocks" ? "/api/desk/stocks" + path : "/api/desk" + path;
+}
 async function pull() {
-  const r = await fetch("/api/desk/state");
+  const r = await fetch(api("/state"));
   const j = await r.json();
   if (!r.ok || j.error) throw new Error(j.error || ("HTTP " + r.status));
   render(j);
 }
+$("#m-crypto").addEventListener("click", () => { market = "crypto"; history.replaceState(null, "", "/desk"); pull().catch((e) => { $("#foot").textContent = e.message; }); });
+$("#m-stocks").addEventListener("click", () => { market = "stocks"; history.replaceState(null, "", "/desk?market=stocks"); pull().catch((e) => { $("#foot").textContent = e.message; }); });
 
 $("#kill").addEventListener("click", async () => {
   $("#kill").disabled = true;
   try {
-    const r = await fetch("/api/desk/kill?on=" + $("#kill").dataset.on, {method: "POST"});
+    const r = await fetch(api("/kill") + "?on=" + $("#kill").dataset.on, {method: "POST"});
     render(await r.json());
   } catch (e) { $("#foot").textContent = e.message; }
   $("#kill").disabled = false;
@@ -166,7 +295,7 @@ $("#kill").addEventListener("click", async () => {
 $("#reset").addEventListener("click", async () => {
   $("#reset").disabled = true;
   try {
-    const r = await fetch("/api/desk/reset", {method: "POST"});
+    const r = await fetch(api("/reset"), {method: "POST"});
     render(await r.json());
   } catch (e) { $("#foot").textContent = e.message; }
   $("#reset").disabled = false;

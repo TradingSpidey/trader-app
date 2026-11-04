@@ -1108,6 +1108,7 @@ def _view(st):
     return {
         "now": _iso(),
         "paper": True,
+        "market": "crypto",
         "brand": "SPIDEY 交易台",
         "sol_usd": _sig(sol),
         "sol_source": st.get("sol_source"),
@@ -1187,3 +1188,31 @@ def reset():
         _log("CHIEF", "模擬倉已重置為 %.0f SOL。之前嘅模擬單清走咗。" % START_SOL, "paper")
         _tick(_state)
         return _view(_state)
+
+
+_PERSIST = ("started_at", "cash_sol", "positions", "closed", "feed", "seq", "kill", "realized_by")
+
+
+def export_book():
+    with _lock:
+        st = _book()
+        return {k: st.get(k) for k in _PERSIST}
+
+
+def import_book(data):
+    if not isinstance(data, dict):
+        return False
+    with _lock:
+        st = _book()
+        for k in _PERSIST:
+            if k in data and data[k] is not None:
+                st[k] = data[k]
+        if not isinstance(st.get("realized_by"), dict):
+            st["realized_by"] = {}
+        if not isinstance(st.get("positions"), list):
+            st["positions"] = []
+        if not isinstance(st.get("closed"), list):
+            st["closed"] = []
+        if not isinstance(st.get("feed"), list):
+            st["feed"] = []
+        return True

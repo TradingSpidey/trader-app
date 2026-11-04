@@ -5,7 +5,7 @@ import sys
 from flask import Flask, jsonify, render_template, request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from traderapp import desk, pipeline  # noqa: E402
+from traderapp import desk, desk_stocks, pipeline  # noqa: E402
 
 app = Flask(__name__)
 
@@ -99,6 +99,31 @@ def api_desk_kill():
 @app.post("/api/desk/reset")
 def api_desk_reset():
     return _wrap(desk.reset)
+
+
+@app.get("/api/desk/stocks/state")
+def api_desk_stocks_state():
+    return _wrap(desk_stocks.snapshot)
+
+
+@app.get("/api/desk/stocks/log")
+def api_desk_stocks_log():
+    return _wrap(desk_stocks.log_view)
+
+
+@app.post("/api/desk/stocks/kill")
+def api_desk_stocks_kill():
+    body = request.get_json(silent=True) or {}
+    if "on" in body:
+        on = bool(body.get("on"))
+    else:
+        on = (request.args.get("on") or "1").strip().lower() not in ("0", "false", "off")
+    return _wrap(lambda: desk_stocks.set_kill(on))
+
+
+@app.post("/api/desk/stocks/reset")
+def api_desk_stocks_reset():
+    return _wrap(desk_stocks.reset)
 
 
 @app.get("/healthz")

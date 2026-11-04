@@ -71,6 +71,35 @@ button.ghost:hover { border-color: var(--cyan); }
   margin: 10px 0; padding: 8px 12px; border-radius: 8px;
   background: rgba(255, 193, 77, .1); border: 1px solid rgba(255, 193, 77, .45); color: #ffe3ad; font-size: 13px;
 }
+.switch { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.switch button { background: transparent; border: 0; color: var(--muted); min-height: 36px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+.switch button.on { background: #12343a; color: var(--cyan); }
+.session-line { margin: 0 0 8px; color: var(--cyan); font-family: var(--mono); font-size: 12px; }
+.office-scroll { overflow-x: auto; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(6, 10, 18, .65); }
+.office { position: relative; min-width: 1080px; height: 500px; background:
+  linear-gradient(180deg, rgba(62, 224, 255, .05), transparent 30%),
+  repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 1px, transparent 1px 80px); }
+.station { position: absolute; width: 150px; text-align: center; cursor: pointer; }
+.station .desklet { height: 36px; margin: 28px 18px 0; border: 1px solid rgba(62, 224, 255, .45); border-radius: 4px; background: #071018; position: relative; }
+.station .desklet svg { width: 100%; height: 100%; }
+.station .label { font-size: 12px; margin-top: 4px; }
+.station .label em { display: block; font-style: normal; font-family: var(--display); font-size: 10px; letter-spacing: .08em; color: var(--c); }
+.bubble { position: absolute; left: 50%; top: -6px; transform: translate(-50%, -100%); max-width: 150px; background: #102033; border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; font-size: 11px; line-height: 1.35; color: var(--text); }
+.person { width: 54px; height: 70px; margin: -18px auto 0; position: relative; transform-origin: 50% 100%; animation: breathe 2.6s ease-in-out infinite; }
+.person .arm { transform-origin: 8px 6px; animation: type 1.1s ease-in-out infinite alternate; }
+.person.work .arm { animation-duration: .18s; }
+.person.idle .arm { animation-duration: 1.4s; }
+.person.shield { animation: none; }
+.person.look { animation: breathe 2.6s ease-in-out infinite; }
+.person.cheer { animation: cheer .45s ease-in-out infinite alternate; }
+.person.slump { animation: none; transform: rotate(8deg) translateY(4px); opacity: .85; }
+.station.to-chief { z-index: 3; animation: handoff 1.1s ease-in-out; }
+@keyframes breathe { 50% { transform: translateY(-3px); } }
+@keyframes type { to { transform: rotate(-18deg); } }
+@keyframes cheer { to { transform: translateY(-8px) rotate(-4deg); } }
+@keyframes handoff { 50% { transform: translate(40px, -24px); } }
+.detail-pop { position: fixed; right: 16px; bottom: 16px; width: min(360px, calc(100% - 24px)); z-index: 5; padding: 12px; }
+.detail-pop[hidden] { display: none; }
 .tape-wrap { display: flex; align-items: center; gap: 10px; overflow: hidden; margin-bottom: 12px; }
 .tag { font-size: 10px; letter-spacing: .08em; border: 1px solid var(--line); border-radius: 99px; padding: 2px 7px; color: var(--muted); white-space: nowrap; }
 .tag.live { color: var(--cyan); border-color: rgba(62, 224, 255, .5); }
@@ -132,5 +161,5 @@ a.ext { color: var(--cyan); }
   .detail { min-height: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ava, .particles i { animation: none; }
+  .ava, .particles i, .person, .person .arm, .station.to-chief { animation: none; }
 }

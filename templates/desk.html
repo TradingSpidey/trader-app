@@ -18,7 +18,7 @@
   <div class="brand">
     <a class="back" href="/">研究室</a>
     <div>
-      <p class="kicker">SOLANA · 公開行情</p>
+      <p class="kicker" id="kicker">SOLANA · 公開行情</p>
       <h1>SPIDEY 交易台</h1>
     </div>
   </div>
@@ -29,11 +29,20 @@
   </div>
   <div class="actions">
     <div class="health" id="health" aria-label="數據源狀態"></div>
+    <div class="switch" role="tablist" aria-label="市場">
+      <button type="button" id="m-crypto" class="on">加密貨幣</button>
+      <button type="button" id="m-stocks">美股</button>
+    </div>
     <button type="button" id="kill" class="ghost">風控停止</button>
     <button type="button" id="reset" class="ghost">重置模擬倉</button>
   </div>
 </header>
-<p class="banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議。</b>唔會連接錢包，亦唔會落真單。免費伺服器瞓着或者重啟之後，呢個模擬倉會清走。</p>
+<p class="banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議。</b>唔會連接錢包，亦唔會落真單。網頁上嘅模擬倉喺伺服器瞓着或者重啟之後會清走。</p>
+<p class="session-line" id="session-line"></p>
+<div class="office-scroll" id="office-scroll">
+  <div class="office" id="office" aria-label="交易室"></div>
+</div>
+<div id="detail" class="detail-pop" hidden></div>
 <div class="tape-wrap" aria-label="行情走馬燈">
   <span class="tag live">即時行情</span>
   <div class="tape" id="tape"><span class="muted">讀緊公開行情…</span></div>
