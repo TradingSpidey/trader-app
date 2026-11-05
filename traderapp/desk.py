@@ -20,12 +20,15 @@ START_SOL = 10.0
 MAX_POSITIONS = 3
 MAX_ORDER_SOL = 1.5
 MAX_POSITION_PCT = 0.15
-MAX_DAILY_LOSS_SOL = 2.0
+# 0.05 SOL on a 10 SOL book. configure() uses the same ratio.
+DAILY_LOSS_OF_START = 0.005
+MAX_DAILY_LOSS_SOL = DAILY_LOSS_OF_START * START_SOL
 MIN_LIQ_WATCH = 15000.0
-MIN_LIQ_TRADE = 25000.0
+MIN_LIQ_TRADE = 50000.0
 TP = 0.25
 SL = 0.12
 MOMENTUM_H1 = 8.0
+MOMENTUM_H1_MAX = 20.0
 FRESH_MINUTES = 180
 FRESH_VOL_H1 = 8000.0
 FDV_LIQ_MAX = 400.0
@@ -45,6 +48,18 @@ _BUCKETS = {
     "ds": {"cap": 24, "tokens": 24.0, "rate": 24 / 60.0, "ts": time.time(), "state": "未查"},
     "rpc": {"cap": 8, "tokens": 8.0, "rate": 8 / 60.0, "ts": time.time(), "state": "未查"},
 }
+
+
+def configure(start_sol=None, **_ignored):
+    """Point the paper book at a starting size. Loss cap stays 0.5% of that size.
+
+    paper50 calls this. It does not reset open positions.
+    """
+    global START_SOL, MAX_DAILY_LOSS_SOL
+    if start_sol is not None:
+        START_SOL = float(start_sol)
+    MAX_DAILY_LOSS_SOL = DAILY_LOSS_OF_START * START_SOL
+    return {"start_sol": START_SOL, "max_daily_loss_sol": MAX_DAILY_LOSS_SOL}
 
 
 def _now():
@@ -709,7 +724,7 @@ def _sniper_ok(pool):
     chg, vol, age = pool.get("change_h1"), pool.get("vol_h1") or 0, pool.get("age_min")
     buys, sells = pool.get("buys_h1"), pool.get("sells_h1")
     flow_ok = True if buys is None or sells is None else buys >= sells
-    momentum = chg is not None and chg >= MOMENTUM_H1
+    momentum = chg is not None and MOMENTUM_H1 <= chg <= MOMENTUM_H1_MAX
     fresh = age is not None and age <= FRESH_MINUTES and vol >= FRESH_VOL_H1 and (chg is None or chg >= 0)
     why = []
     if momentum:
@@ -773,7 +788,7 @@ def _risk_size(st):
         return None, "有倉未有報價或者 SOL 報價暫無，唔開新倉"
     loss = max(0.0, START_SOL - equity)
     room = MAX_DAILY_LOSS_SOL - loss
-    if room <= 0.05:
+    if room <= 0:
         st["kill"] = True
         _log("RISK", "模擬權益低過每日上限，已啟動停止，之後唔開新倉。", "paper")
         _flatten(st, "RISK", "觸發每日虧損上限")
@@ -961,11 +976,11 @@ def _pub_pool(p):
 def _rules():
     return [
         "掃描：大約每 %d 秒更新。GeckoTerminal 新池同熱門池會錯開請求；熱門失敗就用 DexScreener 推廣榜同最新簡介，再讀對應池嘅價、流動性同升跌。上一份成功嘅行情會保留。跳過 SOL／USDC／USDT。" % TICK_SEC,
-        "狙擊先要滿足其中一項：1 小時升幅至少 %.0f%%，或者池齡少過 %d 分鐘而且 1 小時成交至少 $%s；同時 1 小時買入宗數唔少過賣出（有呢兩個數先比較）。" % (MOMENTUM_H1, FRESH_MINUTES, _fmt_int(FRESH_VOL_H1)),
+        "狙擊先要滿足其中一項：1 小時升幅至少 %.0f%% 而且唔超過 %.0f%%（唔追升得太急），或者池齡少過 %d 分鐘而且 1 小時成交至少 $%s；同時 1 小時買入宗數唔少過賣出（有呢兩個數先比較）。新池呢條路唔受 %.0f%% 上限限制。" % (MOMENTUM_H1, MOMENTUM_H1_MAX, FRESH_MINUTES, _fmt_int(FRESH_VOL_H1), MOMENTUM_H1_MAX),
         "防Rug 先至可以模擬買入：流動性至少 $%s；全稀釋市值／流動性唔高過 %.0f 倍；Solana RPC 見到鑄幣權同凍結權係已放棄（null）。十大持倉高過 %.0f%% 就擋。蜜罐標記為真就擋。鑄幣權或凍結權未知就唔落單；十大持倉未知只會寫明原因，唔當安全。" % (_fmt_int(MIN_LIQ_TRADE), FDV_LIQ_MAX, TOP10_BLOCK),
         "大戶讀 GeckoTerminal 該池最近成交，顯示 $500 以上或者最大幾筆，錢包連去 Solscan。冇成交就寫原因。",
         "項目方先用 GeckoTerminal 嘅 developer_address。冇嘅話，用鑄幣地址最早一筆簽名（一頁少過 1000 筆先算最早）嘅付款人，再讀佢而家持有幾多。簽名太多或者 RPC 失敗會寫原因。",
-        "風控：起始 %.0f SOL。每倉最多 %.0f%% 權益或者 %.1f SOL，邊個細用邊個。最多 %d 個倉。止蝕 %.0f%%。模擬虧損去到 %.1f SOL 就停止並用最後報價平倉。" % (
+        "風控：起始 %.4g SOL。每倉最多 %.0f%% 權益或者 %.1f SOL，邊個細用邊個。最多 %d 個倉。止蝕 %.0f%%。模擬虧損去到 %.4g SOL 就停止並用最後報價平倉。" % (
             START_SOL, MAX_POSITION_PCT * 100, MAX_ORDER_SOL, MAX_POSITIONS, SL * 100, MAX_DAILY_LOSS_SOL),
         "執行：模擬升到 +%.0f%% 止賺，跌到 -%.0f%% 止蝕。成交價等於當刻公開報價，冇計滑價同手續費。" % (TP * 100, SL * 100),
         "主管只係把上面幾個崗位嘅結果串埋，自己唔另計一個價。模擬倉存在呢個進程記憶體，伺服器瞓着或者重啟會清走。",
@@ -1077,7 +1092,7 @@ def _view(st):
             "paper" if st["positions"] else "idle"),
         bot("risk", "風控", "倉位同上限", "RISK",
             "停止緊" if st["kill"] else "正常",
-            "每日模擬虧損上限 %.1f SOL。" % MAX_DAILY_LOSS_SOL,
+            "每日模擬虧損上限 %.4g SOL。" % MAX_DAILY_LOSS_SOL,
             [m("權益 SOL", None if equity is None else round(equity, 4), "模擬盤"),
              m("已用虧損額", None if loss is None else round(loss, 4), "模擬盤"),
              m("現金 SOL", round(st["cash_sol"], 4), "模擬盤")],
