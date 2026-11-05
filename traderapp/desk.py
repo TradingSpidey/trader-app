@@ -20,12 +20,12 @@ START_SOL = 10.0
 MAX_POSITIONS = 3
 MAX_ORDER_SOL = 1.5
 MAX_POSITION_PCT = 0.15
-# 0.05 SOL on a 10 SOL book. configure() uses the same ratio.
-DAILY_LOSS_OF_START = 0.005
+# 0.5 SOL on a 10 SOL book. configure() uses the same ratio.
+DAILY_LOSS_OF_START = 0.05
 MAX_DAILY_LOSS_SOL = DAILY_LOSS_OF_START * START_SOL
 MIN_LIQ_WATCH = 15000.0
 MIN_LIQ_TRADE = 50000.0
-TP = 0.25
+TP = 0.08
 SL = 0.12
 MOMENTUM_H1 = 8.0
 MOMENTUM_H1_MAX = 20.0
@@ -51,7 +51,7 @@ _BUCKETS = {
 
 
 def configure(start_sol=None, **_ignored):
-    """Point the paper book at a starting size. Loss cap stays 0.5% of that size.
+    """Point the paper book at a starting size. Loss cap stays 5% of that size.
 
     paper50 calls this. It does not reset open positions.
     """
