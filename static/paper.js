@@ -87,6 +87,24 @@ function winLine(data) {
   return `${((wins / n) * 100).toFixed(1)}%<br>${wl}`;
 }
 
+function cryptoCost(cfg) {
+  const slip = cfg.slippage_per_side == null ? "—" : (Number(cfg.slippage_per_side) * 100).toFixed(1) + "%";
+  const fee = cfg.fee_sol_per_trade == null ? "—" : cfg.fee_sol_per_trade + " SOL";
+  return `每邊滑價 ${slip}，每單手續費 ${fee}。`;
+}
+function stockCost(cfg) {
+  const slipRaw = cfg.slippage_per_side == null ? 0.001 : Number(cfg.slippage_per_side);
+  const feeRaw = cfg.commission_min_usd != null ? Number(cfg.commission_min_usd)
+    : (cfg.commission_usd != null ? Number(cfg.commission_usd) : 0.01);
+  const prose = cfg.costs == null ? "" : String(cfg.costs).trim();
+  const stale = /冇計滑價|冇計手續費|忽略滑價|忽略手續費|無滑價|無手續費|no slippage|ignores slippage|ignores fees/i.test(prose);
+  if (prose && !stale && cfg.slippage_per_side == null && cfg.commission_min_usd == null && cfg.commission_usd == null) {
+    return prose;
+  }
+  const slip = Number.isNaN(slipRaw) ? "—" : (slipRaw * 100).toFixed(1) + "%";
+  const fee = Number.isNaN(feeRaw) ? "—" : feeRaw.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  return `每邊滑價 ${slip}（買入高過報價、賣出低過報價），每邊手續費最少 $${fee}。`;
+}
 function bookCard(name, book, item) {
   if (!item || !item.data) {
     return `<article class="card"><h2>${esc(name)}</h2><p>等緊數據傳上嚟</p></article>`;
@@ -99,9 +117,7 @@ function bookCard(name, book, item) {
   const positions = Array.isArray(d.positions) ? d.positions : [];
   const trades = (Array.isArray(d.trades) ? d.trades.slice() : []).sort((a, b) => (parseTime(b.time_hkt || b.ts) || 0) - (parseTime(a.time_hkt || a.ts) || 0));
   const crypto = book === "crypto";
-  const cost = crypto
-    ? `每邊滑價 ${cfg.slippage_per_side == null ? "—" : (Number(cfg.slippage_per_side) * 100).toFixed(1) + "%"}，每單手續費 ${cfg.fee_sol_per_trade == null ? "—" : cfg.fee_sol_per_trade + " SOL"}。`
-    : dash(cfg.costs);
+  const cost = crypto ? cryptoCost(cfg) : stockCost(cfg);
   const posRows = positions.map((p) => `<tr>
     <td><b>${esc(p.symbol)}</b>${crypto ? `<div class="muted">${esc(shortMint(p.mint))}</div>` : ""}</td>
     <td class="num">${usd(p.entry_usd)}</td>
