@@ -28,6 +28,8 @@ python -m traderapp.desk_runner --market crypto --state-dir /var/spidey/crypto -
 
 `--start-usd` is used only when `state.json` does not exist yet (stocks). The default web starting cash is `$DESK_STOCK_START_USD` or $10,000. Each loop writes `state.json`, and appends `trades.csv` and `equity.csv`. Restarting reloads `state.json`. US stocks open new paper trades only during the New York regular session (09:30–16:00), which is 22:30–05:00 Hong Kong time while the US is on standard time. No wallet, no orders.
 
+US-stock paper fills are worse than the Yahoo quote by `DESK_STOCK_SLIPPAGE_PER_SIDE` (default 0.1% per side: buys above the quote, sells below it) and pay `DESK_STOCK_COMMISSION_USD` (default $0.01 minimum on each buy and each sell). Optional `DESK_STOCK_COMMISSION_RATE` (default 0, a fraction of the fill notional) cannot reduce that minimum. Cash, cost basis, and realized PnL include those costs on each new fill. Positions already open keep the cost basis they were filled with; the next sell still pays sell-side slippage and commission. The Solana paper desk is unchanged. The time machine on the research page is a separate simulation and still ignores slippage and fees.
+
 The always-on machine can publish its two $50 books to the site (this is separate from the in-browser demo book, which resets when Render sleeps):
 
 ```bash

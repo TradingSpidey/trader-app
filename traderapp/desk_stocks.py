@@ -7,6 +7,11 @@ import time
 from traderapp import pipeline
 
 START_USD = float(os.environ.get("DESK_STOCK_START_USD") or "10000")
+# Buys fill above the Yahoo quote, sells below it. 0.001 = 0.1% per side.
+SLIPPAGE_PER_SIDE = float(os.environ.get("DESK_STOCK_SLIPPAGE_PER_SIDE") or "0.001")
+# Charged on each buy and each sell. A rate, if set, still cannot go under this.
+COMMISSION_MIN_USD = float(os.environ.get("DESK_STOCK_COMMISSION_USD") or "0.01")
+COMMISSION_RATE = float(os.environ.get("DESK_STOCK_COMMISSION_RATE") or "0")
 UNIVERSE = pipeline.LIQUID[:20]
 MAX_POSITIONS = 3
 MAX_ORDER_USD = 2000.0
@@ -62,6 +67,115 @@ def _f(v):
         return float(v)
     except (TypeError, ValueError):
         return None
+
+
+def _costs_note():
+    slip = SLIPPAGE_PER_SIDE * 100.0
+    note = "買入成交高過 Yahoo 報價 %.1f%%，賣出低過報價 %.1f%%。每邊手續費最少 $%.2f。" % (
+        slip, slip, COMMISSION_MIN_USD)
+    if COMMISSION_RATE > 0:
+        note += "手續費亦唔低過成交金額 %.2f%%。" % (COMMISSION_RATE * 100.0)
+    return note
+
+
+def _buy_fill(quote):
+    """Execution price for a buy: worse (higher) than the quote."""
+    q = _f(quote)
+    if q is None or q <= 0:
+        return None
+    px = q * (1.0 + SLIPPAGE_PER_SIDE)
+    return px if px > 0 else None
+
+
+def _sell_fill(quote):
+    """Execution price for a sell: worse (lower) than the quote."""
+    q = _f(quote)
+    if q is None or q <= 0:
+        return None
+    px = q * (1.0 - SLIPPAGE_PER_SIDE)
+    return px if px > 0 else None
+
+
+def _commission_usd(notional):
+    """Per-side commission. At least COMMISSION_MIN_USD."""
+    gross = abs(_f(notional) or 0.0)
+    rate = COMMISSION_RATE if COMMISSION_RATE > 0 else 0.0
+    floor = COMMISSION_MIN_USD if COMMISSION_MIN_USD > 0 else 0.0
+    return max(floor, gross * rate)
+
+
+def _plan_buy(quote, budget):
+    """Size a buy so cash out (slipped notional + commission) stays within budget."""
+    fill = _buy_fill(quote)
+    budget = _f(budget)
+    if fill is None or budget is None or budget <= 0:
+        return None
+    rate = COMMISSION_RATE if COMMISSION_RATE > 0 else 0.0
+    floor = COMMISSION_MIN_USD if COMMISSION_MIN_USD > 0 else 0.0
+    qty = None
+    if rate:
+        qty_rate = budget / (fill * (1.0 + rate))
+        if qty_rate * fill * rate + 1e-12 >= floor:
+            qty = qty_rate
+    if qty is None:
+        if budget <= floor:
+            return None
+        qty = (budget - floor) / fill
+    if qty <= 0:
+        return None
+    notional = qty * fill
+    fee = _commission_usd(notional)
+    cash_out = notional + fee
+    if cash_out - budget > 1e-8:
+        if budget <= fee:
+            return None
+        qty = (budget - fee) / fill
+        if qty <= 0:
+            return None
+        notional = qty * fill
+        fee = _commission_usd(notional)
+        cash_out = notional + fee
+    return {
+        "quote": float(quote), "fill": fill, "qty": qty, "notional": notional,
+        "commission_usd": fee, "cash_out": cash_out,
+    }
+
+
+def _plan_sell(quote, qty):
+    fill = _sell_fill(quote)
+    qty = _f(qty)
+    if fill is None or qty is None or qty <= 0:
+        return None
+    notional = qty * fill
+    fee = _commission_usd(notional)
+    return {
+        "quote": float(quote), "fill": fill, "qty": qty, "notional": notional,
+        "commission_usd": fee, "proceeds": notional - fee,
+    }
+
+
+def _fill_buy(st, symbol, quote, budget, why, source="Yahoo"):
+    """Open one paper long. budget is the most cash that may leave, including commission."""
+    available = _f(st.get("cash_usd")) or 0.0
+    cap = _f(budget)
+    if cap is None:
+        return None
+    plan = _plan_buy(quote, min(cap, available))
+    if plan is None:
+        return None
+    st["cash_usd"] = available - plan["cash_out"]
+    pos = {
+        "id": st.get("seq") or 1, "symbol": symbol, "qty": plan["qty"],
+        "entry_usd": plan["fill"], "entry_quote_usd": plan["quote"],
+        "entry_commission_usd": plan["commission_usd"], "cost_usd": plan["cash_out"],
+        "last_usd": plan["quote"], "value_usd": plan["qty"] * plan["quote"],
+        "upnl_usd": plan["qty"] * plan["quote"] - plan["cash_out"],
+        "ret": plan["quote"] / plan["fill"] - 1.0, "opened_at": _iso(),
+        "why": why, "source": source,
+    }
+    st["positions"].append(pos)
+    st["seq"] = int(st.get("seq") or 1) + 1
+    return pos
 
 
 def _bars(series):
@@ -293,16 +407,21 @@ def _equity(st):
 
 
 def _close(st, pos, reason, bot):
-    px = pos.get("last_usd")
-    if not px or px <= 0:
+    plan = _plan_sell(pos.get("last_usd"), pos.get("qty"))
+    if plan is None:
         _log(bot, "%s 未平倉：而家冇 Yahoo 報價，唔會估價。" % pos["symbol"], "paper")
         return False
-    proceeds = pos["qty"] * px
+    proceeds = plan["proceeds"]
     pnl = proceeds - pos["cost_usd"]
     st["cash_usd"] += proceeds
     st["realized_by"][bot] = st["realized_by"].get(bot, 0.0) + pnl
-    st["closed"].append({"symbol": pos["symbol"], "pnl_usd": pnl, "reason": reason, "exit_usd": px, "bot": bot, "ts": _iso(), "qty": pos["qty"]})
-    _log(bot, "模擬平倉 %s（%s），報價 $%.4g，模擬盈虧 %+.2f 美元。" % (pos["symbol"], reason, px, pnl), "paper")
+    st["closed"].append({
+        "symbol": pos["symbol"], "pnl_usd": pnl, "reason": reason, "exit_usd": plan["fill"],
+        "exit_quote_usd": plan["quote"], "exit_commission_usd": plan["commission_usd"],
+        "proceeds_usd": proceeds, "bot": bot, "ts": _iso(), "qty": pos["qty"],
+    })
+    _log(bot, "模擬平倉 %s（%s），Yahoo 報價 $%.4g，成交 $%.4g，手續費 $%.2f，模擬盈虧 %+.2f 美元。" % (
+        pos["symbol"], reason, plan["quote"], plan["fill"], plan["commission_usd"], pnl), "paper")
     return True
 
 
@@ -436,18 +555,15 @@ def _tick(st):
                     if size < 10 or not q.get("price"):
                         route.append("可用模擬現金唔夠")
                     else:
-                        qty = size / q["price"]
-                        st["cash_usd"] -= size
-                        st["positions"].append({
-                            "id": st["seq"], "symbol": q["symbol"], "qty": qty, "entry_usd": q["price"],
-                            "cost_usd": size, "last_usd": q["price"], "value_usd": size, "upnl_usd": 0.0,
-                            "ret": 0.0, "opened_at": _iso(), "why": "、".join(note), "source": "Yahoo",
-                        })
-                        st["seq"] += 1
-                        bought = q["symbol"]
-                        route.append("模擬買入 %s $%.2f" % (q["symbol"], size))
-                        _log("CHIEF", "正規時段。模擬買入 %s，%.4f 股，報價 $%.4g（Yahoo）。唔係真單。" % (q["symbol"], qty, q["price"]), "paper")
-                        _log("SNIPER", "訊號：%s。" % "、".join(note), "market")
+                        pos = _fill_buy(st, q["symbol"], q["price"], size, "、".join(note))
+                        if pos is None:
+                            route.append("可用模擬現金唔夠")
+                        else:
+                            bought = q["symbol"]
+                            route.append("模擬買入 %s $%.2f" % (q["symbol"], pos["cost_usd"]))
+                            _log("CHIEF", "正規時段。模擬買入 %s，%.4f 股，Yahoo 報價 $%.4g，成交 $%.4g，手續費 $%.2f。唔係真單。" % (
+                                q["symbol"], pos["qty"], pos["entry_quote_usd"], pos["entry_usd"], pos["entry_commission_usd"]), "paper")
+                            _log("SNIPER", "訊號：%s。" % "、".join(note), "market")
                 elif blocked:
                     route.append("風險檢查擋 %s：%s" % (blocked[0]["symbol"], "；".join(blocked[1])))
                     st["blocked"] = {"symbol": blocked[0]["symbol"], "reasons": blocked[1]}
@@ -472,7 +588,7 @@ def _rules():
         "搜尋：只對焦點股票讀 trader-news 標題。國會崗位讀眾議院公開申報（預設 Pelosi），唔係即時內幕。",
         "風控：起始金額睇 DESK_STOCK_START_USD（預設 $%.0f）。每倉最多 %.0f%% 或 $%.0f。最多 %d 個倉。模擬虧損去到起始 %.0f%% 就停止。" % (
             START_USD, MAX_POSITION_PCT * 100, MAX_ORDER_USD, MAX_POSITIONS, MAX_DAILY_LOSS_PCT * 100),
-        "執行：模擬 +%.1f%% 止賺，-%.1f%% 止蝕。紐約 15:50 後用當刻報價平倉。成交價等於 Yahoo 報價，可以碎股，冇計滑價同手續費。" % (TP * 100, SL * 100),
+        "執行：模擬 +%.1f%% 止賺，-%.1f%% 止蝕。紐約 15:50 後用當刻報價決定平倉。可以碎股。%s" % (TP * 100, SL * 100, _costs_note()),
         "唔係正規時段唔會開新模擬倉。模擬倉喺網頁進程入面，瞓着會清走；命令列 runner 先會寫入檔案。",
     ]
 
@@ -598,6 +714,12 @@ def _view(st):
         "market_age_sec": None if not st.get("market_at") else int(time.time() - st["market_at"]),
         "sources": {"market": ["Yahoo", "眾議院 Clerk"], "paper": "本進程模擬"},
         "sol_source": None,
+        "costs": {
+            "slippage_per_side": SLIPPAGE_PER_SIDE,
+            "commission_min_usd": COMMISSION_MIN_USD,
+            "commission_rate": COMMISSION_RATE if COMMISSION_RATE > 0 else 0.0,
+            "note": _costs_note(),
+        },
     }
 
 
