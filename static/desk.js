@@ -87,6 +87,15 @@ function winText(a) {
   if (a.win_rate == null) return a.win_rate_text || "未有已平倉交易";
   return (Number(a.win_rate) * 100).toFixed(1) + "%";
 }
+function winBlock(a) {
+  const text = winText(a);
+  const few = text.match(/^樣本太少（已平倉 (\d+) 單）$/);
+  if (few) {
+    return `<b class="stat-value phrase">${esc("樣本太少")}<span class="stat-break">${esc("（已平倉 " + few[1] + " 單）")}</span></b>`;
+  }
+  if (/%$/.test(text)) return `<b class="stat-value num">${esc(text)}</b>`;
+  return `<b class="stat-value phrase">${esc(text)}</b>`;
+}
 function pnlOf(b) { return market === "stocks" ? b.paper_pnl : b.paper_pnl_sol; }
 function upOf(p) { return p.upnl_usd != null ? p.upnl_usd : p.upnl_sol; }
 
@@ -237,6 +246,18 @@ function usdAmt(v, sign) {
   if (n < 0) return "-$" + body;
   return (sign && n > 0 ? "+$" : "$") + body;
 }
+function quietSol(px, amount) {
+  if (px == null || finite(amount) == null) return "";
+  const body = num(amount, 4);
+  return body == null ? "" : body + " SOL";
+}
+function moneyValue(text, tone) {
+  return `<b class="stat-value num${tone ? " " + tone : ""}">${esc(text)}</b>`;
+}
+function statCard(label, valueHtml, solText) {
+  const sol = solText ? `<small class="stat-sol">${esc(solText)}</small>` : "";
+  return `<div class="stat"><span class="stat-label">${esc(label)}</span>${valueHtml}${sol}</div>`;
+}
 function showTitle(which) {
   return which === "stocks" ? "主盤 SHOW｜$100｜Demo STOCKS_V1 CTRL" : "主盤 SHOW｜$100｜Demo 暫定最佳 CTRL";
 }
@@ -258,16 +279,17 @@ function render(j) {
   const equityUsd = kpi.equity;
   const pnlUsd = kpi.pnl;
   const startUsd = kpi.start;
-  const solNote = kpi.px != null && finite(a.equity_sol) != null ? " · " + num(a.equity_sol, 4) + " SOL" : "";
-  const startSol = kpi.px != null && finite(a.start_sol) != null ? " · " + num(a.start_sol, 4) + " SOL" : "";
-  const equityText = equityUsd == null ? "—" : usdAmt(equityUsd, false) + solNote;
+  const equitySol = equityUsd == null ? "" : quietSol(kpi.px, a.equity_sol);
+  const startSol = quietSol(kpi.px, a.start_sol);
+  const equityText = equityUsd == null ? "—" : usdAmt(equityUsd, false);
   const pnlText = pnlUsd == null ? "—" : usdAmt(pnlUsd, true);
-  const startText = "≈ $" + num(startUsd, 0) + startSol;
-  $("#stats").innerHTML = `
-    <div class="stat"><span>今日模擬盈虧</span><b class="num ${pnlUsd == null ? "" : cls(pnlUsd)}">${esc(pnlText)}</b></div>
-    <div class="stat"><span>勝率（已平倉）</span><b class="num">${esc(winText(a))}</b></div>
-    <div class="stat"><span>模擬權益</span><b class="num">${esc(equityText)}</b></div>
-    <div class="stat"><span>起始</span><b class="num">${esc(startText)}</b></div>`;
+  const startText = "≈ $" + num(startUsd, 0);
+  $("#stats").innerHTML = [
+    statCard("今日模擬盈虧", moneyValue(pnlText, pnlUsd == null ? "" : cls(pnlUsd))),
+    statCard("勝率（已平倉）", winBlock(a)),
+    statCard("模擬權益", moneyValue(equityText), equitySol),
+    statCard("起始", moneyValue(startText), startSol),
+  ].join("");
   const kill = $("#kill");
   kill.textContent = a.kill ? "解除停止" : "風控停止";
   kill.classList.toggle("danger", !a.kill);
