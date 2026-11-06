@@ -1,0 +1,33 @@
+{
+  "config": {
+    "start_usd": 50.0,
+    "start_time_hkt": "2026-11-01 22:30:00 HKT",
+    "slippage_per_side": 0.001,
+    "commission_min_usd": 0.01,
+    "trading_hours": "美股常規時段先開新倉"
+  },
+  "state_saved_hkt": "2026-11-06 20:48:42 HKT",
+  "equity_usd": 50.0,
+  "cash_usd": 40.0,
+  "ret_pct": 0,
+  "realized_usd": 0,
+  "unrealized_usd": 0,
+  "buys": 1,
+  "sells": 0,
+  "closed_n": 0,
+  "wins": 0,
+  "positions": [
+    {
+      "symbol": "AVGO",
+      "entry_usd": 10,
+      "last_usd": 10,
+      "ret": 0,
+      "value_usd": 10,
+      "upnl_usd": 0,
+      "opened_at": "2026-11-06 22:35:00 HKT",
+      "why": "測試持倉"
+    }
+  ],
+  "trades": [],
+  "equity": []
+}

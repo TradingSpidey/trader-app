@@ -105,6 +105,86 @@ function stockCost(cfg) {
   const fee = Number.isNaN(feeRaw) ? "—" : feeRaw.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
   return `每邊滑價 ${slip}（買入高過報價、賣出低過報價），每邊手續費最少 $${fee}。`;
 }
+function rankNum(b) {
+  if (!b || b.rank == null || b.rank === "") return null;
+  const n = Number(b.rank);
+  return Number.isFinite(n) ? n : null;
+}
+function pctOfFrac(v) {
+  if (v == null || v === "" || !Number.isFinite(Number(v))) return "—";
+  const n = Number(v) * 100;
+  const text = Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1);
+  return text + "%";
+}
+function statusLabel(s) {
+  const k = String(s || "").toLowerCase();
+  if (!k) return "—";
+  if (k === "running") return "運行中";
+  if (k === "not_started") return "未開始";
+  if (k === "missing_config") return "缺設定";
+  return String(s);
+}
+function shortParams(p) {
+  const q = p && typeof p === "object" ? p : {};
+  const maxPos = q.max_positions == null || q.max_positions === "" ? "—" : String(q.max_positions);
+  return `TP ${pctOfFrac(q.tp)} / SL ${pctOfFrac(q.sl)} · 日虧 ${pctOfFrac(q.daily_loss_of_start)} · 最多 ${maxPos} 倉 · 單倉 ${pctOfFrac(q.max_position_pct)}`;
+}
+function leaderboardHtml(item) {
+  if (!item || !item.data || typeof item.data !== "object") {
+    return `<p class="muted">等緊 Demo 排行榜傳上嚟。十本 $50 加密模擬倉會喺度按名次排。</p>`;
+  }
+  const d = item.data;
+  const received = parseTime(item.received_at);
+  const stale = received != null && Date.now() - received > 10 * 60 * 1000;
+  const rows = (Array.isArray(d.books) ? d.books : []).filter((b) => b && typeof b === "object");
+  rows.sort((a, b) => {
+    const ra = rankNum(a);
+    const rb = rankNum(b);
+    if (ra == null && rb == null) return String(a.id || "").localeCompare(String(b.id || ""));
+    if (ra == null) return 1;
+    if (rb == null) return -1;
+    if (ra !== rb) return ra - rb;
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  });
+  const start = d.start_usd == null || d.start_usd === "" ? "—" : usd(d.start_usd, 0);
+  const counts = (d.initialized_count != null || d.book_count != null)
+    ? ` · 已啟動 ${esc(dash(d.initialized_count))} / ${esc(dash(d.book_count))}` : "";
+  const updated = d.updated_hkt ? String(d.updated_hkt) : "—";
+  const extra = d.disclaimer == null ? "" : String(d.disclaimer).trim();
+  const norm = (s) => s.replace(/[。．.\s]/g, "");
+  const extraHtml = extra && norm(extra) !== norm("模擬盤，唔係真錢，唔係投資建議")
+    ? `<p class="note">${esc(extra)}</p>` : "";
+  const body = rows.length ? `<div class="scroll"><table class="lb"><thead><tr>
+      <th>排名</th><th>編號</th><th>名稱</th><th>權益（美元）</th><th>回報</th><th>贏 / 平倉</th><th>Kill / 狀態</th><th>參數</th>
+    </tr></thead><tbody>${rows.map((b) => {
+      const rank = rankNum(b);
+      const idle = b.initialized === false || b.status === "not_started" || b.status === "missing_config";
+      const killed = b.kill === true;
+      const ret = b.ret_pct == null || b.ret_pct === "" ? null : Number(b.ret_pct);
+      const wins = b.wins == null || b.wins === "" ? "—" : String(b.wins);
+      const closed = b.closed == null || b.closed === "" ? "—" : String(b.closed);
+      const kill = killed ? `<span class="dn">已停 kill</span>` : (b.kill === false ? `<span class="muted">kill 未觸發</span>` : `<span class="muted">kill —</span>`);
+      const tone = killed ? "muted" : (b.status === "running" ? "up" : (b.status === "not_started" || b.status === "missing_config" ? "wait" : ""));
+      return `<tr class="${idle ? "idle" : ""} ${killed ? "killed" : ""}">
+        <td class="num">${rank == null ? "—" : esc(String(rank))}</td>
+        <td class="num">${esc(b.id || "—")}</td>
+        <td><b>${esc(b.label || "—")}</b>${b.note ? `<div class="muted">${esc(b.note)}</div>` : ""}</td>
+        <td class="num">${usd(b.equity_usd, 2)}</td>
+        <td class="num ${cls(ret)}">${pctPoints(b.ret_pct)}${b.ret_sol_pct == null || b.ret_sol_pct === "" ? "" : `<div class="muted">SOL ${esc(pctPoints(b.ret_sol_pct))}</div>`}</td>
+        <td class="num">${esc(wins)} / ${esc(closed)}${b.open_positions == null || b.open_positions === "" ? "" : `<div class="muted">持倉 ${esc(String(b.open_positions))}</div>`}</td>
+        <td>${kill}<div class="${tone}">${esc(statusLabel(b.status))}</div></td>
+        <td class="params">${esc(shortParams(b.params))}</td>
+      </tr>`;
+    }).join("")}</tbody></table></div>` : `<p class="muted">未有帳本</p>`;
+  return `<div class="lb-head">
+      <p class="note">更新（香港）<b class="num">${esc(updated)}</b></p>
+      <p class="note">起始 ${esc(start)}${counts}${stale ? ` · <span class="stale">數據可能過時（我部電腦暫停中）</span>` : ` · ${esc(ago(received))}`}</p>
+    </div>
+    ${extraHtml}
+    ${body}
+    ${d.params_source ? `<p class="note">參數來源：${esc(d.params_source)}</p>` : ""}`;
+}
+
 function bookCard(name, book, item) {
   if (!item || !item.data) {
     return `<article class="card"><h2>${esc(name)}</h2><p>等緊數據傳上嚟</p></article>`;
@@ -170,9 +250,17 @@ function bookCard(name, book, item) {
 
 async function load() {
   const r = await fetch("/api/paper");
+  if (!r.ok) throw new Error("讀唔到成績");
   const j = await r.json();
-  $("#books").innerHTML = `<div class="books">${bookCard("加密貨幣", "crypto", j.crypto)}${bookCard("美股", "stocks", j.stocks)}</div>`;
+  const lb = $("#leaderboard");
+  if (lb) lb.innerHTML = leaderboardHtml(j && j.leaderboard);
+  const books = $("#books");
+  if (books) books.innerHTML = `<div class="books">${bookCard("加密貨幣", "crypto", j.crypto)}${bookCard("美股", "stocks", j.stocks)}</div>`;
 }
-$("#books").id = "books";
-load().catch((e) => { $("#books").textContent = e.message; });
+load().catch((e) => {
+  const lb = $("#leaderboard");
+  if (lb) lb.textContent = e.message;
+  const books = $("#books");
+  if (books) books.textContent = e.message;
+});
 setInterval(() => load().catch(() => {}), 30000);

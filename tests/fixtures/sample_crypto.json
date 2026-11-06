@@ -1,0 +1,35 @@
+{
+  "config": {
+    "start_usd": 50.0,
+    "start_time_hkt": "2026-11-01 09:00:00 HKT",
+    "start_sol": 0.55,
+    "slippage_per_side": 0.001,
+    "fee_sol_per_trade": 0.00005
+  },
+  "state_saved_hkt": "2026-11-06 20:48:42 HKT",
+  "equity_usd": 49.85,
+  "equity_sol": 0.5512,
+  "ret_usd_pct": -0.3,
+  "ret_sol_pct": -0.3,
+  "realized_sol": 0,
+  "unrealized_sol": -0.001,
+  "buys": 1,
+  "sells": 0,
+  "closed_n": 0,
+  "wins": 0,
+  "positions": [
+    {
+      "symbol": "Dacity",
+      "mint": "So11111111111111111111111111111111111111112",
+      "entry_usd": 0.01,
+      "last_usd": 0.01,
+      "ret": 0,
+      "value_sol": 0.08,
+      "upnl_sol": 0,
+      "opened_at": "2026-11-06 20:40:00 HKT",
+      "why": "測試持倉"
+    }
+  ],
+  "trades": [],
+  "equity": []
+}

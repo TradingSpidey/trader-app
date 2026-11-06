@@ -4,25 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#05070d">
-<title>$50 模擬盤成績</title>
+<title>{% if demo_only %}Demo 排行榜 D01–D10{% else %}$50 模擬盤成績{% endif %}</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070d'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%233ee0ff' stroke-width='2'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/paper.css">
 </head>
-<body>
+<body data-demo-only="{{ '1' if demo_only else '0' }}">
 <div class="wrap">
 <header class="top">
   <div>
     <a class="back" href="/desk">返交易台</a>
     <a class="back" href="/">研究室</a>
+    {% if demo_only %}
+    <a class="back" href="/paper">返 $50 成績</a>
+    <h1>Demo 排行榜 D01–D10</h1>
+    <p class="sub">十本 $50 加密模擬倉，TP / SL / 日虧 / 倉數唔同，只係比較用。</p>
+    {% else %}
+    <a class="back" href="/paper/demo">Demo 排行榜</a>
     <h1>$50 模擬盤成績</h1>
-    <p class="sub">呢兩本係我部電腦 24 小時跑緊嘅模擬倉，唔係 Render 上面個示範盤。</p>
+    <p class="sub">加密同美股係我部電腦 24 小時跑緊嘅模擬倉，唔係 Render 上面個示範盤。D01–D10 係並行 demo。</p>
+    {% endif %}
   </div>
 </header>
-<p class="banner"><b>模擬盤，唔係真錢，唔係投資建議。</b>加密同美股成本假設唔同，唔好直接比較回報。</p>
+<p class="banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議。</b> <span class="en">Paper trading only. Not real money. Not investment advice.</span> 加密同美股成本假設唔同，唔好直接比較回報。</p>
+<section class="card lb-card" aria-labelledby="lb-title">
+  <h2 id="lb-title">Demo 排行榜 D01–D10</h2>
+  <p class="banner demo-banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議。</b> <span class="en">Paper trading demo. Not real money. Not investment advice.</span></p>
+  <div id="leaderboard"><p class="muted">等緊 Demo 排行榜傳上嚟</p></div>
+</section>
+{% if not demo_only %}
 <div id="books"><p class="muted">等緊數據傳上嚟</p></div>
+{% endif %}
 </div>
 <script src="/static/paper.js"></script>
 </body>
