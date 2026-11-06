@@ -194,12 +194,34 @@ def show_book(book):
     for p in positions:
         if not isinstance(p, dict):
             continue
+        entry = p.get("entry_usd")
+        if entry is None:
+            entry = p.get("entry")
+        last = p.get("last_usd")
+        if last is None:
+            last = p.get("mark_usd")
+        if last is None:
+            last = p.get("mark") if p.get("mark") is not None else p.get("price")
+        qty = p.get("qty")
+        if qty is None:
+            qty = p.get("size") if p.get("size") is not None else p.get("shares")
+        upnl_sol = p.get("upnl_sol")
+        upnl_usd = p.get("upnl_usd")
+        if _num(upnl_usd) is None and _num(upnl_sol) is not None and sol:
+            upnl_usd = round(_num(upnl_sol) * float(sol), 2)
+        value_usd = p.get("value_usd")
+        value_sol = p.get("value_sol")
+        if qty is None and _num(value_usd) is not None and _num(last):
+            qty = _num(value_usd) / _num(last)
+        elif qty is None and _num(value_sol) is not None and _num(last) and sol:
+            qty = _num(value_sol) * float(sol) / _num(last)
         pub.append({
-            "symbol": p.get("symbol"), "mint": p.get("mint"), "qty": p.get("qty"),
-            "entry_usd": p.get("entry_usd"), "last_usd": p.get("last_usd"),
-            "upnl_sol": p.get("upnl_sol"), "upnl_usd": p.get("upnl_usd"),
+            "symbol": p.get("symbol"), "mint": p.get("mint"), "qty": qty,
+            "entry_usd": entry, "last_usd": last,
+            "upnl_sol": upnl_sol, "upnl_usd": upnl_usd,
             "why": p.get("why") or p.get("reason"),
-            "cost_sol": p.get("cost_sol"), "value_sol": p.get("value_sol"),
+            "cost_sol": p.get("cost_sol"), "value_sol": value_sol,
+            "value_usd": value_usd, "cost_usd": p.get("cost_usd"),
         })
     return {
         "mirror": True,

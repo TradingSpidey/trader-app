@@ -254,6 +254,92 @@ function quietSol(px, amount) {
 function moneyValue(text, tone) {
   return `<b class="stat-value num${tone ? " " + tone : ""}">${esc(text)}</b>`;
 }
+function firstNum() {
+  for (let i = 0; i < arguments.length; i++) {
+    const n = finite(arguments[i]);
+    if (n != null) return n;
+  }
+  return null;
+}
+function qtyText(n) {
+  const abs = Math.abs(n);
+  const d = abs >= 1000 ? 2 : abs >= 1 ? 4 : abs >= 0.0001 ? 6 : 8;
+  return n.toLocaleString("en-US", {maximumFractionDigits: d});
+}
+function pxText(v) {
+  const n = finite(v);
+  if (n == null) return "—";
+  const abs = Math.abs(n);
+  const opts = abs >= 1
+    ? {minimumFractionDigits: 2, maximumFractionDigits: 2}
+    : {maximumFractionDigits: 8};
+  return "$" + n.toLocaleString("en-US", opts);
+}
+function markOf(p) { return firstNum(p.last_usd, p.mark_usd, p.mark, p.price); }
+function entryOf(p) { return firstNum(p.entry_usd, p.entry); }
+function qtyOf(p, solUsd) {
+  let qty = firstNum(p.qty, p.size, p.shares);
+  const last = markOf(p);
+  const valueUsd = finite(p.value_usd);
+  const valueSol = finite(p.value_sol);
+  if (qty == null && valueUsd != null && last) qty = valueUsd / last;
+  if (qty == null && valueSol != null && last && solUsd) qty = valueSol * solUsd / last;
+  return qty;
+}
+function sizeParts(p, solUsd) {
+  const qty = qtyOf(p, solUsd);
+  const valueSol = finite(p.value_sol);
+  const costSol = finite(p.cost_sol);
+  const valueUsd = finite(p.value_usd);
+  const solSize = valueSol != null ? valueSol : costSol;
+  let main = "—";
+  if (qty != null) main = qtyText(qty);
+  else if (solSize != null) main = num(solSize, 4) + " SOL";
+  else if (valueUsd != null) main = usdAmt(valueUsd, false) || "—";
+  const sub = qty != null && solSize != null && market !== "stocks" ? num(solSize, 4) + " SOL" : "";
+  return {main: main, sub: sub};
+}
+function upnlParts(p, solUsd) {
+  let usdPnl = finite(p.upnl_usd);
+  const solPnl = finite(p.upnl_sol);
+  if (usdPnl == null && solPnl != null && solUsd != null) usdPnl = solPnl * solUsd;
+  if (usdPnl == null) {
+    const qty = qtyOf(p, solUsd);
+    const entry = entryOf(p);
+    const last = markOf(p);
+    if (qty != null && entry != null && last != null) usdPnl = (last - entry) * qty;
+  }
+  return {usd: usdPnl, sol: market === "stocks" ? null : solPnl};
+}
+function renderHoldings(j) {
+  const box = $("#holdings");
+  if (!box) return;
+  const pos = Array.isArray(j.positions) ? j.positions : [];
+  const solUsd = finite(j.sol_usd);
+  const head = `<div class="holdings-h"><h2>持倉</h2>${pos.length ? `<span class="holdings-count">${pos.length} 倉</span>` : ""}</div>`;
+  if (!pos.length) {
+    box.innerHTML = head + `<p class="muted empty">而家冇持倉</p>`;
+    return;
+  }
+  const rows = pos.map((p) => {
+    const size = sizeParts(p, solUsd);
+    const pnl = upnlParts(p, solUsd);
+    const pnlText = pnl.usd == null ? "—" : usdAmt(pnl.usd, true);
+    const pnlSol = pnl.sol == null ? "" : `<small class="hold-sol">${esc(sol(pnl.sol, true))}</small>`;
+    const sizeSub = size.sub ? `<small class="hold-sol">${esc(size.sub)}</small>` : "";
+    const sym = p.symbol || (p.mint ? String(p.mint).slice(0, 4) : "—");
+    return `<tr>
+      <td data-label="代號"><b>${esc(sym)}</b></td>
+      <td class="num" data-label="數量">${esc(size.main)}${sizeSub}</td>
+      <td class="num" data-label="入場">${esc(pxText(entryOf(p)))}</td>
+      <td class="num" data-label="而家">${esc(pxText(markOf(p)))}</td>
+      <td class="num ${cls(pnl.usd)}" data-label="未實現盈虧"><b>${esc(pnlText)}</b>${pnlSol}</td>
+    </tr>`;
+  }).join("");
+  box.innerHTML = head + `<div class="hold-scroll"><table class="hold-table"><thead><tr>
+      <th>代號</th><th class="num">數量</th><th class="num">入場</th><th class="num">而家</th><th class="num">未實現盈虧</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 function statCard(label, valueHtml, solText) {
   const sol = solText ? `<small class="stat-sol">${esc(solText)}</small>` : "";
   return `<div class="stat"><span class="stat-label">${esc(label)}</span>${valueHtml}${sol}</div>`;
@@ -290,6 +376,7 @@ function render(j) {
     statCard("模擬權益", moneyValue(equityText), equitySol),
     statCard("起始", moneyValue(startText), startSol),
   ].join("");
+  renderHoldings(j);
   const kill = $("#kill");
   kill.textContent = a.kill ? "解除停止" : "風控停止";
   kill.classList.toggle("danger", !a.kill);

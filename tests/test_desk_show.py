@@ -197,8 +197,25 @@ class CryptoShowTests(unittest.TestCase):
         self.assertAlmostEqual(view["account"]["day_pnl_usd"], -0.32)
         self.assertAlmostEqual(view["account"]["start_usd"], 100)
         self.assertEqual(view["positions"][0]["symbol"], "AMD")
+        self.assertAlmostEqual(view["positions"][0]["upnl_usd"], round(0.01 * 90.5, 2))
         self.assertEqual(view["badge"], "主盤 SHOW｜$100｜Demo 暫定最佳 CTRL")
         self.assertFalse(view["account"]["quote_missing"])
+
+    def test_open_position_includes_usd_upnl(self):
+        st = desk._blank()
+        st["sol_usd"] = 100
+        st["cash_sol"] = 0.5
+        st["start_sol"] = 1.0
+        st["positions"] = [{
+            "symbol": "BONK", "mint": "m", "qty": 1000, "entry_usd": 0.01,
+            "last_usd": 0.012, "cost_sol": 0.1, "upnl_sol": 0.02, "ret": 0.2,
+        }]
+        view = desk._view(st)
+        row = view["positions"][0]
+        self.assertEqual(row["symbol"], "BONK")
+        self.assertAlmostEqual(row["upnl_sol"], 0.02)
+        self.assertAlmostEqual(row["upnl_usd"], 2.0)
+        self.assertEqual(view["badge"], "主盤 SHOW｜$100｜Demo 暫定最佳 CTRL")
 
 
 class StockShowTests(unittest.TestCase):
@@ -230,10 +247,19 @@ class StockShowTests(unittest.TestCase):
         js = (root / "static" / "desk.js").read_text(encoding="utf-8")
         self.assertIn("模擬盤，唔係真錢，唔係投資建議。", html)
         self.assertIn("主盤 SHOW｜$100｜Demo 暫定最佳 CTRL", html)
-        self.assertIn("/static/desk.js?v=show4", html)
-        self.assertIn("/static/desk.css?v=show4", html)
+        self.assertIn("/static/desk.js?v=show5", html)
+        self.assertIn("/static/desk.css?v=show5", html)
+        self.assertLess(html.index('id="stats"'), html.index('id="holdings"'))
+        self.assertLess(html.index('id="holdings"'), html.index('id="office"'))
+        self.assertIn(">持倉<", html)
+        self.assertIn("而家冇持倉", html)
+        self.assertNotIn("而家冇持倉。", html)
         self.assertIn("主盤 SHOW｜$100｜Demo STOCKS_V1 CTRL", js)
         self.assertIn("function kpiFigures", js)
+        self.assertIn("function renderHoldings", js)
+        self.assertIn("未實現盈虧", js)
+        self.assertIn("而家冇持倉", js)
+        self.assertNotIn("而家冇持倉。", js)
         self.assertIn("function usdAmt", js)
         self.assertIn("function quietSol", js)
         self.assertIn("stat-label", js)
