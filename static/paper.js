@@ -129,6 +129,43 @@ function shortParams(p) {
   const maxPos = q.max_positions == null || q.max_positions === "" ? "—" : String(q.max_positions);
   return `TP ${pctOfFrac(q.tp)} / SL ${pctOfFrac(q.sl)} · 日虧 ${pctOfFrac(q.daily_loss_of_start)} · 最多 ${maxPos} 倉 · 單倉 ${pctOfFrac(q.max_position_pct)}`;
 }
+
+function demoBookDetail(b) {
+  const positions = Array.isArray(b.positions) ? b.positions : [];
+  const trades = (Array.isArray(b.trades) ? b.trades.slice() : []).sort((a, c) => (parseTime(c.time_hkt || c.ts) || 0) - (parseTime(a.time_hkt || a.ts) || 0));
+  const posRows = positions.map((p) => `<tr>
+    <td><b>${esc(p.symbol)}</b><div class="muted">${esc(shortMint(p.mint))}</div></td>
+    <td class="num">${usd(p.entry_usd)}</td>
+    <td class="num">${usd(p.last_usd)}</td>
+    <td class="num ${cls(p.ret)}">${pctFrac(p.ret)}</td>
+    <td class="num">${sol(p.value_sol)}</td>
+    <td class="num ${cls(p.upnl_sol)}">${sol(p.upnl_sol)}</td>
+    <td class="num">${esc(fmtHKT(p.opened_at))}</td>
+    <td>${esc(p.why || p.reason || "暫無數據")}</td>
+  </tr>`).join("");
+  const tradeRows = trades.map((t) => {
+    const pnl = t.pnl_sol;
+    return `<tr>
+      <td class="num">${esc(fmtHKT(t.time_hkt || t.ts))}</td>
+      <td>${esc(sideName(t.side || t.action))}</td>
+      <td>${esc(t.symbol)}</td>
+      <td class="num">${usd(t.price_usd)}</td>
+      <td class="num">${esc(dash(t.qty != null && t.qty !== "" ? t.qty : t.sol))}</td>
+      <td>${esc(dash(t.reason))}</td>
+      <td class="num ${cls(Number(pnl))}">${pnl == null || pnl === "" ? "—" : esc(String(pnl))}</td>
+    </tr>`;
+  }).join("");
+  return `<article class="card lb-book" id="book-${esc(b.id || "")}">
+    <h3>${esc(b.id || "—")} · ${esc(b.label || "—")}</h3>
+    <p class="note">權益 ${usd(b.equity_usd, 2)} · 回報 ${pctPoints(b.ret_pct)} · 持倉 ${esc(String(b.open_positions == null ? positions.length : b.open_positions))} · 贏/平 ${esc(dash(b.wins))} / ${esc(dash(b.closed))}</p>
+    <h4>持倉</h4>
+    ${positions.length ? `<div class="scroll"><table><thead><tr><th>代號</th><th>入場</th><th>而家</th><th>回報</th><th>市值</th><th>浮動</th><th>開倉（香港）</th><th>原因</th></tr></thead><tbody>${posRows}</tbody></table></div>` : `<p class="muted">未有持倉</p>`}
+    <h4 style="margin-top:10px">成交</h4>
+    ${trades.length ? `<div class="scroll"><table><thead><tr><th>時間（香港）</th><th>方向</th><th>代號</th><th>價格</th><th>數量</th><th>原因</th><th>盈虧</th></tr></thead><tbody>${tradeRows}</tbody></table></div>` : `<p class="muted">未有成交</p>`}
+  </article>`;
+}
+
+
 function leaderboardHtml(item) {
   if (!item || !item.data || typeof item.data !== "object") {
     return `<p class="muted">等緊 Demo 排行榜傳上嚟。十本 $50 加密模擬倉會喺度按名次排。</p>`;
@@ -176,12 +213,14 @@ function leaderboardHtml(item) {
         <td class="params">${esc(shortParams(b.params))}</td>
       </tr>`;
     }).join("")}</tbody></table></div>` : `<p class="muted">未有帳本</p>`;
+  const details = rows.map(demoBookDetail).join("");
   return `<div class="lb-head">
       <p class="note">更新（香港）<b class="num">${esc(updated)}</b></p>
       <p class="note">起始 ${esc(start)}${counts}${stale ? ` · <span class="stale">數據可能過時（我部電腦暫停中）</span>` : ` · ${esc(ago(received))}`}</p>
     </div>
     ${extraHtml}
     ${body}
+    <div class="lb-books">${details || ""}</div>
     ${d.params_source ? `<p class="note">參數來源：${esc(d.params_source)}</p>` : ""}`;
 }
 
