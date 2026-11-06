@@ -120,6 +120,105 @@ def _public(item):
     return {"received_at": item.get("received_at"), "data": data}
 
 
+def _num(v):
+    try:
+        if v is None or v == "":
+            return None
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def show_book(book):
+    """Account strip for /desk. Uses the ingested main book when one has arrived."""
+    item = load_all().get(book)
+    if not item or not isinstance(item.get("data"), dict):
+        return None
+    data = item["data"]
+    cfg = data.get("config") if isinstance(data.get("config"), dict) else {}
+    start = _num(cfg.get("start_usd"))
+    if start is None:
+        start = _num(data.get("start_usd"))
+    if start is None:
+        start = 100.0
+    sol = _num(data.get("sol_usd")) or _num(cfg.get("sol_usd_at_start"))
+    eq_sol = _num(data.get("equity_sol"))
+    eq_usd = _num(data.get("equity_usd"))
+    cash_sol = _num(data.get("cash_sol"))
+    cash_usd = _num(data.get("cash_usd"))
+    positions = data.get("positions") if isinstance(data.get("positions"), list) else []
+    if eq_usd is None and eq_sol is not None and sol:
+        eq_usd = eq_sol * sol
+    if eq_usd is None and cash_usd is not None:
+        pos_usd, known = 0.0, True
+        for p in positions:
+            if not isinstance(p, dict):
+                continue
+            if _num(p.get("value_usd")) is not None:
+                pos_usd += _num(p.get("value_usd"))
+            elif _num(p.get("cost_usd")) is not None and _num(p.get("upnl_usd")) is not None:
+                pos_usd += _num(p.get("cost_usd")) + _num(p.get("upnl_usd"))
+            elif _num(p.get("cost_usd")) is not None:
+                pos_usd += _num(p.get("cost_usd"))
+            else:
+                known = False
+        if known:
+            eq_usd = cash_usd + pos_usd
+    if eq_usd is None and sol and cash_sol is not None:
+        pos_sol, known = 0.0, True
+        for p in positions:
+            if not isinstance(p, dict):
+                continue
+            if _num(p.get("value_sol")) is not None:
+                pos_sol += _num(p.get("value_sol"))
+            elif _num(p.get("qty")) is not None and _num(p.get("last_usd")) is not None:
+                pos_sol += _num(p.get("qty")) * _num(p.get("last_usd")) / sol
+            elif _num(p.get("cost_sol")) is not None:
+                pos_sol += _num(p.get("cost_sol"))
+            else:
+                known = False
+        if known:
+            eq_sol = cash_sol + pos_sol
+            eq_usd = eq_sol * sol
+    if eq_usd is None:
+        return None
+    start_sol = _num(cfg.get("start_sol"))
+    if start_sol is None and sol and sol > 0:
+        start_sol = start / sol
+    if isinstance(data.get("closed"), list):
+        closed_n = len(data["closed"])
+    else:
+        closed_n = int(_num(data.get("closed_n")) or 0)
+    wins = int(_num(data.get("wins")) or 0)
+    pub = []
+    for p in positions:
+        if not isinstance(p, dict):
+            continue
+        pub.append({
+            "symbol": p.get("symbol"), "mint": p.get("mint"), "qty": p.get("qty"),
+            "entry_usd": p.get("entry_usd"), "last_usd": p.get("last_usd"),
+            "upnl_sol": p.get("upnl_sol"), "upnl_usd": p.get("upnl_usd"),
+            "why": p.get("why") or p.get("reason"),
+            "cost_sol": p.get("cost_sol"), "value_sol": p.get("value_sol"),
+        })
+    return {
+        "mirror": True,
+        "label": cfg.get("label") or "",
+        "start_usd": start,
+        "start_sol": None if start_sol is None else round(start_sol, 6),
+        "equity_usd": round(eq_usd, 2),
+        "day_pnl_usd": round(eq_usd - start, 2),
+        "equity_sol": None if eq_sol is None else round(eq_sol, 6),
+        "cash_sol": cash_sol,
+        "cash_usd": cash_usd,
+        "sol_usd": sol,
+        "positions": pub,
+        "wins": wins,
+        "closed": closed_n,
+        "open": len(pub),
+    }
+
+
 def load_leaderboard():
     with _lock:
         if _mem.get(LEADERBOARD) is None:
