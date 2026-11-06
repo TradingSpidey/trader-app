@@ -52,3 +52,17 @@ th { color: var(--muted); font-weight: 600; }
   .books { grid-template-columns: 1fr; }
   h1 { font-size: 22px; }
 }
+
+.funnel-card { margin-top: 12px; }
+.funnel-stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.funnel-stage { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: rgba(8,14,26,.7); min-width: 0; }
+.funnel-stage b { display: block; font-size: 13px; margin-bottom: 4px; }
+.funnel-stage .counts { font-family: var(--mono); font-size: 12px; color: var(--cyan); }
+.funnel-stage .detail { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.funnel-log { max-height: 280px; overflow: auto; }
+.funnel-log li { margin: 0 0 6px; }
+.tag.skip { color: var(--amber); border-color: rgba(255,193,77,.45); }
+.tag.copy { color: var(--mint); border-color: rgba(61,255,176,.45); }
+.tag.pass { color: var(--cyan); border-color: rgba(62,224,255,.45); }
+.tag.exit { color: var(--red); border-color: rgba(255,93,122,.45); }
+@media (max-width: 900px) { .funnel-stages { grid-template-columns: 1fr 1fr; } }
