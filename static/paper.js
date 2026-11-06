@@ -144,7 +144,20 @@ function fmtLiq(v) {
   if (Math.abs(n) < 10) return pctOfFrac(n);
   return "$" + n.toLocaleString("en-US", {maximumFractionDigits: 0});
 }
-function shortParams(p) {
+function bookCombo(b) {
+  if (!b || typeof b !== "object") return "";
+  const fromBook = b.combo;
+  const fromParams = b.params && typeof b.params === "object" ? b.params.combo : "";
+  const raw = fromBook != null && fromBook !== "" ? fromBook : fromParams;
+  if (raw == null || raw === "") return "";
+  return String(raw);
+}
+function matrixWait(bookCount) {
+  const n = Number(bookCount);
+  const count = Number.isFinite(n) && n > 0 ? String(Math.trunc(n)) : "78";
+  return count + " 本交叉組合（CTRL + CX/QX/AX/ZX）";
+}
+function shortParams(p, combo) {
   const q = p && typeof p === "object" ? p : {};
   const maxPos = q.max_positions == null || q.max_positions === "" ? "—" : String(q.max_positions);
   const bits = [`TP ${pctOfFrac(q.tp)} / SL ${pctOfFrac(q.sl)} · 日虧 ${pctOfFrac(q.daily_loss_of_start)} · 最多 ${maxPos} 倉 · 單倉 ${pctOfFrac(q.max_position_pct)}`];
@@ -154,10 +167,13 @@ function shortParams(p) {
   if (mom) bits.push(`MOM ${mom}`);
   if (liq) bits.push(`LIQ ${liq}`);
   if (top10) bits.push(`TOP10 ${top10}`);
+  const code = combo || (q.combo == null || q.combo === "" ? "" : String(q.combo));
+  if (code) bits.unshift(String(code));
   return bits.join(" · ");
 }
 
 function demoBookDetail(b) {
+  const combo = bookCombo(b);
   const positions = Array.isArray(b.positions) ? b.positions : [];
   const trades = (Array.isArray(b.trades) ? b.trades.slice() : []).sort((a, c) => (parseTime(c.time_hkt || c.ts) || 0) - (parseTime(a.time_hkt || a.ts) || 0));
   const posRows = positions.map((p) => `<tr>
@@ -183,7 +199,7 @@ function demoBookDetail(b) {
     </tr>`;
   }).join("");
   return `<article class="card lb-book" id="book-${esc(b.id || "")}">
-    <h3>${esc(b.id || "—")} · ${esc(b.label || "—")}</h3>
+    <h3>${esc(b.id || "—")} · ${esc(b.label || "—")}${combo ? ` · ${esc(combo)}` : ""}</h3>
     <p class="note">權益 ${usd(b.equity_usd, 2)} · 回報 ${pctPoints(b.ret_pct)} · 持倉 ${esc(String(b.open_positions == null ? positions.length : b.open_positions))} · 贏/平 ${esc(dash(b.wins))} / ${esc(dash(b.closed))}</p>
     <h4>持倉</h4>
     ${positions.length ? `<div class="scroll"><table><thead><tr><th>代號</th><th>入場</th><th>而家</th><th>回報</th><th>市值</th><th>浮動</th><th>開倉（香港）</th><th>原因</th></tr></thead><tbody>${posRows}</tbody></table></div>` : `<p class="muted">未有持倉</p>`}
@@ -195,7 +211,7 @@ function demoBookDetail(b) {
 
 function leaderboardHtml(item) {
   if (!item || !item.data || typeof item.data !== "object") {
-    return `<p class="muted">等緊 Demo 排行榜傳上嚟。43 本角色交叉組合 V5（CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤）會喺度按名次排。</p>`;
+    return `<p class="muted">等緊 Demo 排行榜傳上嚟。${esc(matrixWait())}會喺度按名次排。</p>`;
   }
   const d = item.data;
   const received = parseTime(item.received_at);
@@ -222,6 +238,7 @@ function leaderboardHtml(item) {
       <th>排名</th><th>編號</th><th>名稱</th><th>權益（美元）</th><th>回報</th><th>贏 / 平倉</th><th>Kill / 狀態</th><th>參數</th>
     </tr></thead><tbody>${rows.map((b) => {
       const rank = rankNum(b);
+      const combo = bookCombo(b);
       const idle = b.initialized === false || b.status === "not_started" || b.status === "missing_config";
       const killed = b.kill === true;
       const ret = b.ret_pct == null || b.ret_pct === "" ? null : Number(b.ret_pct);
@@ -232,14 +249,14 @@ function leaderboardHtml(item) {
       return `<tr class="${idle ? "idle" : ""} ${killed ? "killed" : ""}">
         <td class="num">${rank == null ? "—" : esc(String(rank))}</td>
         <td class="num">${esc(b.id || "—")}</td>
-        <td><b>${esc(b.label || "—")}</b>${b.note ? `<div class="muted">${esc(b.note)}</div>` : ""}</td>
+        <td><b>${esc(b.label || "—")}</b>${combo ? `<div class="muted">${esc(combo)}</div>` : ""}${b.note ? `<div class="muted">${esc(b.note)}</div>` : ""}</td>
         <td class="num">${usd(b.equity_usd, 2)}</td>
         <td class="num ${cls(ret)}">${pctPoints(b.ret_pct)}${b.ret_sol_pct == null || b.ret_sol_pct === "" ? "" : `<div class="muted">SOL ${esc(pctPoints(b.ret_sol_pct))}</div>`}</td>
         <td class="num">${esc(wins)} / ${esc(closed)}${b.open_positions == null || b.open_positions === "" ? "" : `<div class="muted">持倉 ${esc(String(b.open_positions))}</div>`}</td>
         <td>${kill}<div class="${tone}">${esc(statusLabel(b.status))}</div></td>
-        <td class="params">${esc(shortParams(b.params))}</td>
+        <td class="params">${esc(shortParams(b.params, combo))}</td>
       </tr>`;
-    }).join("")}</tbody></table></div>` : `<p class="muted">未有帳本</p>`;
+    }).join("")}</tbody></table></div>` : `<p class="muted">未有帳本。${esc(matrixWait(d.book_count))}會喺度按名次排。</p>`;
   const details = rows.map(demoBookDetail).join("");
   return `<div class="lb-head">
       <p class="note">更新（香港）<b class="num">${esc(updated)}</b></p>
