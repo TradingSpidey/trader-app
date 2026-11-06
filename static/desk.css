@@ -78,6 +78,11 @@ h2 { font-size: 15px; font-weight: 700; }
 .kicker, .session-line { margin: 0; color: var(--muted); font-family: var(--mono); font-size: 12px; }
 .session-line { flex: 1; min-width: 0; }
 .demo-note { margin: 0 0 10px; color: var(--amber); font-size: 12px; }
+.show-badge {
+  display: inline-block; max-width: 100%; padding: 4px 8px;
+  border: 1px solid #3a2e16; border-radius: 8px; background: #161208;
+  line-height: 1.45;
+}
 main { padding: 14px 16px 28px; min-width: 0; max-width: 100%; }
 .banner {
   margin: 0; padding: 8px 16px; font-size: 13px; line-height: 1.5;

@@ -16,50 +16,208 @@ USDT_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 SKIP_MINTS = {SOL_MINT, USDC_MINT, USDT_MINT}
 SKIP_SYMS = {"SOL", "WSOL", "USDC", "USDT", "USD"}
 
-START_SOL = 10.0
-MAX_POSITIONS = 3
-MAX_ORDER_SOL = 1.5
-MAX_POSITION_PCT = 0.15
-# 0.5 SOL on a 10 SOL book. configure() uses the same ratio.
-DAILY_LOSS_OF_START = 0.05
-MAX_DAILY_LOSS_SOL = DAILY_LOSS_OF_START * START_SOL
-MIN_LIQ_WATCH = 15000.0
-MIN_LIQ_TRADE = 50000.0
-TP = 0.05
-SL = 0.06
-MOMENTUM_H1 = 8.0
-MOMENTUM_H1_MAX = 20.0
-FRESH_MINUTES = 180
-FRESH_VOL_H1 = 8000.0
-FDV_LIQ_MAX = 400.0
+# Public /desk book. MATRIX_V6 demo books were tied (0 fills), so this is CTRL.
+CTRL_COMBO = "E0-K0-N0-S0-G0"
+SHOW_BADGE = "主盤 SHOW｜$100｜Demo 暫定最佳 CTRL"
+START_USD = float(os.environ.get("DESK_START_USD") or "100")
+_CTRL = {
+    "tp": 0.05,
+    "sl": 0.06,
+    "daily_loss_of_start": 0.25,
+    "max_positions": 3,
+    "max_position_pct": 0.15,
+    "momentum_h1": 8.0,
+    "momentum_h1_max": 14.0,
+    "fresh_minutes": 90,
+    "fresh_vol_h1": 25000.0,
+    "min_liq_trade": 100000.0,
+    "min_liq_watch": 30000.0,
+    "fdv_liq_max": 200.0,
+    "top10_block": 45.0,
+    "buy_sell_min_ratio": 1.25,
+    "max_dev_hold_pct": 12.0,
+    "min_holders": 80,
+    "scout_enabled": True,
+    "slippage": 0.0,
+    "fee_sol": 0.0,
+}
+TP = _CTRL["tp"]
+SL = _CTRL["sl"]
+DAILY_LOSS_OF_START = _CTRL["daily_loss_of_start"]
+MAX_POSITIONS = _CTRL["max_positions"]
+MAX_POSITION_PCT = _CTRL["max_position_pct"]
+MOMENTUM_H1 = _CTRL["momentum_h1"]
+MOMENTUM_H1_MAX = _CTRL["momentum_h1_max"]
+FRESH_MINUTES = _CTRL["fresh_minutes"]
+FRESH_VOL_H1 = _CTRL["fresh_vol_h1"]
+MIN_LIQ_TRADE = _CTRL["min_liq_trade"]
+MIN_LIQ_WATCH = _CTRL["min_liq_watch"]
+FDV_LIQ_MAX = _CTRL["fdv_liq_max"]
+TOP10_BLOCK = _CTRL["top10_block"]
+BUY_SELL_MIN_RATIO = _CTRL["buy_sell_min_ratio"]
+MAX_DEV_HOLD_PCT = _CTRL["max_dev_hold_pct"]
+MIN_HOLDERS = _CTRL["min_holders"]
+SCOUT_ENABLED = _CTRL["scout_enabled"]
+SLIPPAGE = _CTRL["slippage"]
+FEE_SOL = _CTRL["fee_sol"]
+# SOL size is  START_USD / live SOL-USD. It stays 0 until that print exists.
+START_SOL = 0.0
+MAX_ORDER_SOL = 0.0
+MAX_DAILY_LOSS_SOL = 0.0
 TICK_SEC = 30
 OHLCV_CAP = 2
 LIST_TTL = 100
 RPC_URL = (os.environ.get("SOLANA_RPC_URL") or "https://api.mainnet-beta.solana.com").strip()
-TOP10_BLOCK = 80.0
 
 _lock = threading.Lock()
 _cache = {}
 _sec = {}
 _state = None
 _phase = {"n": 0}
+_explicit_start = False
+_start_priced = False
 _BUCKETS = {
     "gt": {"cap": 18, "tokens": 18.0, "rate": 18 / 60.0, "ts": time.time(), "state": "未查"},
     "ds": {"cap": 24, "tokens": 24.0, "rate": 24 / 60.0, "ts": time.time(), "state": "未查"},
     "rpc": {"cap": 8, "tokens": 8.0, "rate": 8 / 60.0, "ts": time.time(), "state": "未查"},
 }
 
+_KNOBS = {
+    "tp": ("TP", float),
+    "sl": ("SL", float),
+    "daily_loss_of_start": ("DAILY_LOSS_OF_START", float),
+    "max_positions": ("MAX_POSITIONS", lambda v: int(float(v))),
+    "max_position_pct": ("MAX_POSITION_PCT", float),
+    "momentum_h1": ("MOMENTUM_H1", float),
+    "momentum_h1_max": ("MOMENTUM_H1_MAX", float),
+    "fresh_minutes": ("FRESH_MINUTES", lambda v: int(float(v))),
+    "fresh_vol_h1": ("FRESH_VOL_H1", float),
+    "min_liq_trade": ("MIN_LIQ_TRADE", float),
+    "min_liq_watch": ("MIN_LIQ_WATCH", float),
+    "fdv_liq_max": ("FDV_LIQ_MAX", float),
+    "top10_block": ("TOP10_BLOCK", float),
+    "buy_sell_min_ratio": ("BUY_SELL_MIN_RATIO", float),
+    "max_dev_hold_pct": ("MAX_DEV_HOLD_PCT", float),
+    "min_holders": ("MIN_HOLDERS", lambda v: int(float(v))),
+    "scout_enabled": ("SCOUT_ENABLED", lambda v: v if isinstance(v, bool) else str(v).strip().lower() not in ("0", "false", "no", "off", "")),
+    "slippage": ("SLIPPAGE", float),
+    "fee_sol": ("FEE_SOL", float),
+}
 
-def configure(start_sol=None, **_ignored):
-    """Point the paper book at a starting size. Loss cap stays 5% of that size.
 
-    paper50 calls this. It does not reset open positions.
+def _sync_caps():
+    global MAX_DAILY_LOSS_SOL, MAX_ORDER_SOL
+    MAX_DAILY_LOSS_SOL = DAILY_LOSS_OF_START * START_SOL
+    MAX_ORDER_SOL = START_SOL * MAX_POSITION_PCT
+
+
+def apply_ctrl():
+    """Restore the public-desk CTRL baseline. Does not clear positions."""
+    global TP, SL, DAILY_LOSS_OF_START, MAX_POSITIONS, MAX_POSITION_PCT
+    global MOMENTUM_H1, MOMENTUM_H1_MAX, FRESH_MINUTES, FRESH_VOL_H1
+    global MIN_LIQ_TRADE, MIN_LIQ_WATCH, FDV_LIQ_MAX, TOP10_BLOCK
+    global BUY_SELL_MIN_RATIO, MAX_DEV_HOLD_PCT, MIN_HOLDERS, SCOUT_ENABLED
+    global SLIPPAGE, FEE_SOL, _explicit_start
+    TP = float(_CTRL["tp"])
+    SL = float(_CTRL["sl"])
+    DAILY_LOSS_OF_START = float(_CTRL["daily_loss_of_start"])
+    MAX_POSITIONS = int(_CTRL["max_positions"])
+    MAX_POSITION_PCT = float(_CTRL["max_position_pct"])
+    MOMENTUM_H1 = float(_CTRL["momentum_h1"])
+    MOMENTUM_H1_MAX = float(_CTRL["momentum_h1_max"])
+    FRESH_MINUTES = int(_CTRL["fresh_minutes"])
+    FRESH_VOL_H1 = float(_CTRL["fresh_vol_h1"])
+    MIN_LIQ_TRADE = float(_CTRL["min_liq_trade"])
+    MIN_LIQ_WATCH = float(_CTRL["min_liq_watch"])
+    FDV_LIQ_MAX = float(_CTRL["fdv_liq_max"])
+    TOP10_BLOCK = float(_CTRL["top10_block"])
+    BUY_SELL_MIN_RATIO = float(_CTRL["buy_sell_min_ratio"])
+    MAX_DEV_HOLD_PCT = float(_CTRL["max_dev_hold_pct"])
+    MIN_HOLDERS = int(_CTRL["min_holders"])
+    SCOUT_ENABLED = bool(_CTRL["scout_enabled"])
+    SLIPPAGE = float(_CTRL["slippage"])
+    FEE_SOL = float(_CTRL["fee_sol"])
+    _explicit_start = False
+    _sync_caps()
+
+
+def _params():
+    return {
+        "combo": CTRL_COMBO,
+        "tp": TP, "sl": SL, "daily_loss_of_start": DAILY_LOSS_OF_START,
+        "max_positions": MAX_POSITIONS, "max_position_pct": MAX_POSITION_PCT,
+        "momentum_h1": MOMENTUM_H1, "momentum_h1_max": MOMENTUM_H1_MAX,
+        "fresh_minutes": FRESH_MINUTES, "fresh_vol_h1": FRESH_VOL_H1,
+        "min_liq_trade": MIN_LIQ_TRADE, "min_liq_watch": MIN_LIQ_WATCH,
+        "fdv_liq_max": FDV_LIQ_MAX, "top10_block": TOP10_BLOCK,
+        "buy_sell_min_ratio": BUY_SELL_MIN_RATIO, "max_dev_hold_pct": MAX_DEV_HOLD_PCT,
+        "min_holders": MIN_HOLDERS, "scout_enabled": bool(SCOUT_ENABLED),
+        "slippage": SLIPPAGE, "fee_sol": FEE_SOL,
+        "start_usd": None if _explicit_start else START_USD,
+        "start_sol": START_SOL if (_start_priced or _explicit_start) else None,
+        "max_daily_loss_sol": MAX_DAILY_LOSS_SOL,
+        "max_order_sol": MAX_ORDER_SOL,
+    }
+
+
+def configure(start_sol=None, **kw):
+    """Set the same role knobs paper50 passes in. Does not reset open positions.
+
+    start_sol, when given, is an explicit SOL bankroll and is not rewritten
+    from DESK_START_USD. Other knobs left out keep their current values.
     """
-    global START_SOL, MAX_DAILY_LOSS_SOL
+    global START_SOL, _explicit_start, _start_priced
+    for key, val in kw.items():
+        if key not in _KNOBS or val is None:
+            continue
+        name, cast = _KNOBS[key]
+        globals()[name] = cast(val)
     if start_sol is not None:
         START_SOL = float(start_sol)
-    MAX_DAILY_LOSS_SOL = DAILY_LOSS_OF_START * START_SOL
-    return {"start_sol": START_SOL, "max_daily_loss_sol": MAX_DAILY_LOSS_SOL}
+        _explicit_start = True
+        _start_priced = START_SOL > 0
+    _sync_caps()
+    out = _params()
+    out["start_sol"] = START_SOL
+    return out
+
+
+def _price_start(st, force=False):
+    """Lock start_sol = START_USD / live SOL-USD once. Never invent a price or a PnL."""
+    global START_SOL, _start_priced
+    if _explicit_start:
+        _sync_caps()
+        if force:
+            st["cash_sol"] = START_SOL
+            st["start_sol"] = START_SOL
+        elif st.get("start_sol") is None and START_SOL > 0:
+            st["start_sol"] = START_SOL
+        return
+    if st.get("start_sol") is not None and not force:
+        if not _start_priced:
+            START_SOL = float(st["start_sol"])
+            _start_priced = START_SOL > 0
+            _sync_caps()
+        return
+    traded = bool(st.get("positions") or st.get("closed"))
+    if not force and (traded or (st.get("cash_sol") or 0) > 0):
+        if st.get("start_sol") is None and not traded and st.get("cash_sol"):
+            st["start_sol"] = float(st["cash_sol"])
+            START_SOL = float(st["cash_sol"])
+            _start_priced = True
+            _sync_caps()
+        return
+    px = _f(st.get("sol_usd"))
+    if not px or px <= 0:
+        return
+    START_SOL = START_USD / px
+    _start_priced = True
+    _sync_caps()
+    st["start_sol"] = START_SOL
+    st["cash_sol"] = START_SOL
+
+
+apply_ctrl()
 
 
 def _now():
@@ -73,7 +231,8 @@ def _iso(dt=None):
 def _blank():
     return {
         "started_at": _iso(),
-        "cash_sol": START_SOL,
+        "start_sol": None,
+        "cash_sol": 0.0,
         "positions": [],
         "closed": [],
         "feed": [],
@@ -714,18 +873,36 @@ def _rug(pool, info):
         if top is not None and top > TOP10_BLOCK:
             reasons.append("十大持倉 %.1f%% 高過 %.0f%%" % (top, TOP10_BLOCK))
             blocked = True
+        holders = info.get("holders_count")
+        if holders is not None and holders < MIN_HOLDERS:
+            reasons.append("持有人數 %d 少過 %d" % (holders, MIN_HOLDERS))
+            blocked = True
+        elif MIN_HOLDERS and holders is None:
+            unknown.append("持有人數")
+        dev = info.get("developer_holding_percentage")
+        if dev is not None and dev > MAX_DEV_HOLD_PCT:
+            reasons.append("項目方持倉 %.1f%% 高過 %.0f%%" % (dev, MAX_DEV_HOLD_PCT))
+            blocked = True
         if info.get("is_honeypot") is True:
             reasons.append("資料標記為蜜罐")
             blocked = True
     return {"blocked": blocked, "reasons": reasons, "unknown": unknown, "info": info}
 
 
+def _flow_ok(pool):
+    buys, sells = pool.get("buys_h1"), pool.get("sells_h1")
+    if buys is None or sells is None:
+        return True
+    if sells <= 0:
+        return buys > 0
+    return (float(buys) / float(sells)) >= BUY_SELL_MIN_RATIO
+
+
 def _sniper_ok(pool):
     chg, vol, age = pool.get("change_h1"), pool.get("vol_h1") or 0, pool.get("age_min")
-    buys, sells = pool.get("buys_h1"), pool.get("sells_h1")
-    flow_ok = True if buys is None or sells is None else buys >= sells
+    flow_ok = _flow_ok(pool)
     momentum = chg is not None and MOMENTUM_H1 <= chg <= MOMENTUM_H1_MAX
-    fresh = age is not None and age <= FRESH_MINUTES and vol >= FRESH_VOL_H1 and (chg is None or chg >= 0)
+    fresh = bool(SCOUT_ENABLED) and age is not None and age <= FRESH_MINUTES and vol >= FRESH_VOL_H1 and (chg is None or chg >= 0)
     why = []
     if momentum:
         why.append("1 小時升 %.2f%%" % chg)
@@ -754,11 +931,14 @@ def _mark(st):
 
 def _close(st, pos, reason, bot):
     sol = st.get("sol_usd")
-    px = pos.get("last_usd")
+    quote = pos.get("last_usd")
+    slip = SLIPPAGE if SLIPPAGE and SLIPPAGE > 0 else 0.0
+    fee = FEE_SOL if FEE_SOL and FEE_SOL > 0 else 0.0
+    px = None if not quote or quote <= 0 else quote * (1.0 - slip)
     if not sol or not px or px <= 0:
         _log(bot, "%s 未平倉：而家冇可用報價，唔會估價。" % pos["symbol"], "paper")
         return False
-    proceeds = pos["qty"] * px / sol
+    proceeds = pos["qty"] * px / sol - fee
     pnl = proceeds - pos["cost_sol"]
     st["cash_sol"] += proceeds
     st["realized_by"][bot] = st["realized_by"].get(bot, 0.0) + pnl
@@ -779,23 +959,34 @@ def _flatten(st, bot, reason):
     st["positions"] = keep
 
 
+def _min_order_sol():
+    if START_SOL <= 0 or MAX_POSITION_PCT <= 0:
+        return 0.05
+    return min(0.05, START_SOL * MAX_POSITION_PCT * 0.5)
+
+
 def _risk_size(st):
     sol = st.get("sol_usd")
     equity, missing = _equity(st)
+    base = st.get("start_sol")
+    if base is None:
+        base = START_SOL if (_start_priced or _explicit_start) else None
     if st["kill"]:
         return None, "風控停止緊，唔開新倉"
+    if base is None or base <= 0:
+        return None, "等緊 SOL 報價，未寫低起始資金"
     if missing or equity is None or not sol:
         return None, "有倉未有報價或者 SOL 報價暫無，唔開新倉"
-    loss = max(0.0, START_SOL - equity)
-    room = MAX_DAILY_LOSS_SOL - loss
+    loss = max(0.0, float(base) - equity)
+    room = (DAILY_LOSS_OF_START * float(base)) - loss
     if room <= 0:
         st["kill"] = True
         _log("RISK", "模擬權益低過每日上限，已啟動停止，之後唔開新倉。", "paper")
         _flatten(st, "RISK", "觸發每日虧損上限")
         return None, "已觸發每日虧損上限"
-    budget = room / SL
+    budget = room / SL if SL else 0.0
     size = min(MAX_ORDER_SOL, equity * MAX_POSITION_PCT, budget, st["cash_sol"])
-    if size < 0.05:
+    if size < _min_order_sol():
         return None, "可用模擬 SOL 或者剩餘虧損額度唔夠一張細單"
     return size, None
 
@@ -826,6 +1017,7 @@ def _fmt_px(v):
 
 def _tick(st):
     pools = _load_market(st)
+    _price_start(st)
     _mark(st)
     route = []
     held = {p["mint"] for p in st["positions"]}
@@ -909,20 +1101,28 @@ def _tick(st):
                 route.append("SOL 報價暫無，唔換算，唔落單")
             else:
                 cost = min(size, st["cash_sol"])
-                qty = cost * st["sol_usd"] / pool["price_usd"]
-                st["cash_sol"] -= cost
-                st["positions"].append({
-                    "id": st["seq"], "symbol": pool["symbol"], "mint": pool["mint"], "pool": pool["pool"],
-                    "qty": qty, "entry_usd": pool["price_usd"], "cost_sol": cost, "opened_at": _iso(),
-                    "last_usd": pool["price_usd"], "value_sol": cost, "upnl_sol": 0.0, "ret": 0.0,
-                    "why": "、".join(why), "source": pool["source"],
-                })
-                st["seq"] += 1
-                bought = pool["symbol"]
-                route.append("模擬買入 %s %.2f SOL" % (pool["symbol"], cost))
-                _log("CHIEF", "路徑通過。模擬買入 %s，用 %.4f SOL，報價 $%s（%s）。唔係真單。" % (
-                    pool["symbol"], cost, _fmt_px(pool["price_usd"]), pool["source"]), "paper")
-                _log("SNIPER", "入市訊號：%s。" % "、".join(why), "market")
+                quote = pool["price_usd"]
+                slip = SLIPPAGE if SLIPPAGE and SLIPPAGE > 0 else 0.0
+                fee = FEE_SOL if FEE_SOL and FEE_SOL > 0 else 0.0
+                fill = quote * (1.0 + slip)
+                if fill <= 0 or cost <= fee:
+                    route.append("可用模擬 SOL 唔夠手續費")
+                    fill = None
+                if fill:
+                    qty = (cost - fee) * st["sol_usd"] / fill
+                    st["cash_sol"] -= cost
+                    st["positions"].append({
+                        "id": st["seq"], "symbol": pool["symbol"], "mint": pool["mint"], "pool": pool["pool"],
+                        "qty": qty, "entry_usd": fill, "cost_sol": cost, "opened_at": _iso(),
+                        "last_usd": quote, "value_sol": cost - fee, "upnl_sol": (cost - fee) - cost, "ret": (quote / fill) - 1.0,
+                        "why": "、".join(why), "source": pool["source"],
+                    })
+                    st["seq"] += 1
+                    bought = pool["symbol"]
+                    route.append("模擬買入 %s %.2f SOL" % (pool["symbol"], cost))
+                    _log("CHIEF", "路徑通過。模擬買入 %s，用 %.4f SOL，報價 $%s（%s）。唔係真單。" % (
+                        pool["symbol"], cost, _fmt_px(quote), pool["source"]), "paper")
+                    _log("SNIPER", "入市訊號：%s。" % "、".join(why), "market")
 
     rug_target = focus.get("rug") or (signals[0][0] if signals else None) or (newest[0] if newest else None) or (trending[0] if trending else None)
     if rug_target and "rug_result" not in focus:
@@ -973,24 +1173,118 @@ def _pub_pool(p):
     }
 
 
-def _rules():
+def _rules(st=None):
+    base = None if not isinstance(st, dict) else st.get("start_sol")
+    if base is None and (_start_priced or _explicit_start) and START_SOL > 0:
+        base = START_SOL
+    if base:
+        usd_bit = "" if _explicit_start else "（約 $%.0f）" % START_USD
+        risk = "風控：起始 %.4g SOL%s。每倉最多 %.0f%% 權益或者 %.4g SOL，邊個細用邊個。最多 %d 個倉。止蝕 %.0f%%。模擬虧損去到起始 %.0f%%（%.4g SOL）就停止並用最後報價平倉。" % (
+            base, usd_bit, MAX_POSITION_PCT * 100, base * MAX_POSITION_PCT, MAX_POSITIONS, SL * 100,
+            DAILY_LOSS_OF_START * 100, DAILY_LOSS_OF_START * base)
+    else:
+        risk = "風控：起始約 $%.0f，等緊 SOL 報價先至換成 SOL。每倉最多 %.0f%%。最多 %d 個倉。止蝕 %.0f%%。模擬虧損去到起始 %.0f%% 就停止。" % (
+            START_USD, MAX_POSITION_PCT * 100, MAX_POSITIONS, SL * 100, DAILY_LOSS_OF_START * 100)
     return [
         "掃描：大約每 %d 秒更新。GeckoTerminal 新池同熱門池會錯開請求；熱門失敗就用 DexScreener 推廣榜同最新簡介，再讀對應池嘅價、流動性同升跌。上一份成功嘅行情會保留。跳過 SOL／USDC／USDT。" % TICK_SEC,
-        "狙擊先要滿足其中一項：1 小時升幅至少 %.0f%% 而且唔超過 %.0f%%（唔追升得太急），或者池齡少過 %d 分鐘而且 1 小時成交至少 $%s；同時 1 小時買入宗數唔少過賣出（有呢兩個數先比較）。新池呢條路唔受 %.0f%% 上限限制。" % (MOMENTUM_H1, MOMENTUM_H1_MAX, FRESH_MINUTES, _fmt_int(FRESH_VOL_H1), MOMENTUM_H1_MAX),
-        "防Rug 先至可以模擬買入：流動性至少 $%s；全稀釋市值／流動性唔高過 %.0f 倍；Solana RPC 見到鑄幣權同凍結權係已放棄（null）。十大持倉高過 %.0f%% 就擋。蜜罐標記為真就擋。鑄幣權或凍結權未知就唔落單；十大持倉未知只會寫明原因，唔當安全。" % (_fmt_int(MIN_LIQ_TRADE), FDV_LIQ_MAX, TOP10_BLOCK),
+        "主盤係 Demo V6 CTRL %s。狙擊先要滿足其中一項：1 小時升幅至少 %.0f%% 而且唔超過 %.0f%%（唔追升得太急）%s；同時 1 小時買入／賣出至少 %.2f 倍（有呢兩個數先比較）。新池呢條路唔受 %.0f%% 上限限制。觀察流動性至少 $%s。" % (
+            CTRL_COMBO, MOMENTUM_H1, MOMENTUM_H1_MAX,
+            ("，或者池齡少過 %d 分鐘而且 1 小時成交至少 $%s" % (FRESH_MINUTES, _fmt_int(FRESH_VOL_H1))) if SCOUT_ENABLED else "（新池偵察已關）",
+            BUY_SELL_MIN_RATIO, MOMENTUM_H1_MAX, _fmt_int(MIN_LIQ_WATCH)),
+        "防Rug 先至可以模擬買入：流動性至少 $%s；全稀釋市值／流動性唔高過 %.0f 倍；Solana RPC 見到鑄幣權同凍結權係已放棄（null）。十大持倉高過 %.0f%% 就擋。持有人數少過 %d 就擋。項目方持倉高過 %.0f%% 就擋。蜜罐標記為真就擋。鑄幣權或凍結權未知就唔落單；十大持倉或持有人數未知只會寫明原因，唔當安全。" % (
+            _fmt_int(MIN_LIQ_TRADE), FDV_LIQ_MAX, TOP10_BLOCK, MIN_HOLDERS, MAX_DEV_HOLD_PCT),
         "大戶讀 GeckoTerminal 該池最近成交，顯示 $500 以上或者最大幾筆，錢包連去 Solscan。冇成交就寫原因。",
         "項目方先用 GeckoTerminal 嘅 developer_address。冇嘅話，用鑄幣地址最早一筆簽名（一頁少過 1000 筆先算最早）嘅付款人，再讀佢而家持有幾多。簽名太多或者 RPC 失敗會寫原因。",
-        "風控：起始 %.4g SOL。每倉最多 %.0f%% 權益或者 %.1f SOL，邊個細用邊個。最多 %d 個倉。止蝕 %.0f%%。模擬虧損去到 %.4g SOL 就停止並用最後報價平倉。" % (
-            START_SOL, MAX_POSITION_PCT * 100, MAX_ORDER_SOL, MAX_POSITIONS, SL * 100, MAX_DAILY_LOSS_SOL),
-        "執行：模擬升到 +%.0f%% 止賺，跌到 -%.0f%% 止蝕。成交價等於當刻公開報價，冇計滑價同手續費。" % (TP * 100, SL * 100),
+        risk,
+        "執行：模擬升到 +%.0f%% 止賺，跌到 -%.0f%% 止蝕。%s" % (
+            TP * 100, SL * 100,
+            ("買入加 %.2f%% 滑價，賣出減 %.2f%%，每邊 %.6f SOL 手續費。" % (SLIPPAGE * 100, SLIPPAGE * 100, FEE_SOL))
+            if (SLIPPAGE or FEE_SOL) else "成交價等於當刻公開報價，冇計滑價同手續費。"),
         "主管只係把上面幾個崗位嘅結果串埋，自己唔另計一個價。模擬倉存在呢個進程記憶體，伺服器瞓着或者重啟會清走。",
     ]
+
+
+def _book_start(st):
+    base = st.get("start_sol")
+    if base is None and (_start_priced or _explicit_start) and START_SOL > 0:
+        base = START_SOL
+    if base is None or float(base) <= 0:
+        return None
+    return float(base)
+
+
+def _estimate_sol(st, equity):
+    """SOL equity, or cash plus whatever position marks exist. None only when there is no cash and no price."""
+    if equity is not None:
+        return equity
+    cash = st.get("cash_sol")
+    if cash is None:
+        return None
+    sol = _f(st.get("sol_usd"))
+    total = float(cash)
+    for pos in st.get("positions") or []:
+        if pos.get("value_sol") is not None:
+            total += pos["value_sol"]
+        elif sol and pos.get("qty") and pos.get("last_usd"):
+            total += pos["qty"] * pos["last_usd"] / sol
+        elif pos.get("cost_sol") is not None:
+            total += pos["cost_sol"]
+        else:
+            return None
+    if not st.get("positions") and not (_start_priced or _explicit_start) and total <= 0:
+        return None
+    return total
+
+
+def _present(view):
+    """Fill USD KPIs, then prefer the ingested $100 main book when it is on disk."""
+    try:
+        from traderapp import paper_store
+        show = paper_store.show_book("crypto")
+    except Exception:
+        show = None
+    acct = view.get("account") or {}
+    if show:
+        closed_n = show.get("closed") or 0
+        wins = show.get("wins") or 0
+        acct.update({
+            "start_usd": show["start_usd"],
+            "trial_usd": show["start_usd"],
+            "start_sol": show.get("start_sol"),
+            "start_priced": True,
+            "equity_usd": show["equity_usd"],
+            "day_pnl_usd": show["day_pnl_usd"],
+            "equity_sol": show.get("equity_sol"),
+            "cash_sol": show["cash_sol"] if show.get("cash_sol") is not None else acct.get("cash_sol"),
+            "quote_missing": False,
+            "mirror": True,
+            "wins": wins,
+            "closed": closed_n,
+            "open": show.get("open") or 0,
+            "win_rate": None if not closed_n else round(wins / float(closed_n), 4),
+            "win_rate_text": None if closed_n else "未有已平倉交易",
+        })
+        view["positions"] = show.get("positions") or []
+        view["mirror"] = True
+        if show.get("sol_usd"):
+            view["sol_usd"] = show["sol_usd"]
+    view["account"] = acct
+    view["badge"] = SHOW_BADGE
+    return view
 
 
 def _view(st):
     sol = st.get("sol_usd")
     equity, missing = _equity(st)
-    loss = None if equity is None else max(0.0, START_SOL - equity)
+    base = _book_start(st)
+    est_sol = _estimate_sol(st, equity)
+    sol_px = _f(sol)
+    equity_usd = None if est_sol is None or not sol_px else round(est_sol * sol_px, 2)
+    start_usd = None if _explicit_start else START_USD
+    if start_usd is None and base and sol_px:
+        start_usd = round(base * sol_px, 2)
+    day_pnl_usd = None if equity_usd is None or start_usd is None else round(equity_usd - start_usd, 2)
+    loss = None if est_sol is None or base is None else max(0.0, base - est_sol)
     wins = sum(1 for c in st["closed"] if c["pnl_sol"] > 0)
     losses = sum(1 for c in st["closed"] if c["pnl_sol"] < 0)
     closed_n = len(st["closed"])
@@ -1028,7 +1322,7 @@ def _view(st):
             "trades": trades or [], "trades_note": trades_note,
         }
 
-    scan = [p for p in st["pools"] if p.get("origin") == "新池"]
+    scan = [p for p in st["pools"] if p.get("origin") == "新池" and (p.get("liq_usd") or 0) >= MIN_LIQ_WATCH]
     scan.sort(key=lambda p: p.get("age_min") if p.get("age_min") is not None else 1e12)
     trend = [p for p in st["pools"] if p.get("origin") == "熱門"]
     whale = focus.get("whale")
@@ -1120,25 +1414,33 @@ def _view(st):
     radar = []
     for p in scan[:8]:
         radar.append(_pub_pool(p))
-    return {
+    payload = {
         "now": _iso(),
         "paper": True,
         "market": "crypto",
         "brand": "SPIDEY 交易台",
+        "badge": SHOW_BADGE,
+        "combo": CTRL_COMBO,
+        "params": _params(),
         "sol_usd": _sig(sol),
         "sol_source": st.get("sol_source"),
         "account": {
-            "start_sol": START_SOL,
+            "start_sol": None if base is None else round(base, 6),
+            "start_usd": start_usd,
+            "trial_usd": None if _explicit_start else START_USD,
+            "start_priced": base is not None or equity_usd is not None,
             "cash_sol": round(st["cash_sol"], 6),
-            "equity_sol": None if equity is None else round(equity, 6),
-            "day_pnl_sol": None if equity is None else round(equity - START_SOL, 6),
+            "equity_sol": None if est_sol is None else round(est_sol, 6),
+            "equity_usd": equity_usd,
+            "day_pnl_sol": None if est_sol is None or base is None else round(est_sol - base, 6),
+            "day_pnl_usd": day_pnl_usd,
             "wins": wins, "losses": losses, "closed": closed_n,
             "win_rate": None if not closed_n else round(wins / closed_n, 4),
             "win_rate_text": None if closed_n else "未有已平倉交易",
             "kill": st["kill"],
             "open": len(st["positions"]),
             "max_open": MAX_POSITIONS,
-            "max_daily_loss_sol": MAX_DAILY_LOSS_SOL,
+            "max_daily_loss_sol": None if base is None else round(DAILY_LOSS_OF_START * base, 6),
             "quote_missing": missing,
         },
         "bots": bots,
@@ -1153,7 +1455,7 @@ def _view(st):
             "why": p.get("why"), "source": p.get("source"), "opened_at": p.get("opened_at"),
         } for p in st["positions"]],
         "feed": list(reversed(st["feed"][-24:])),
-        "rules": _rules(),
+        "rules": _rules(st),
         "errors": st.get("errors") or [],
         "health": {
             "geckoterminal": _BUCKETS["gt"]["state"],
@@ -1165,6 +1467,7 @@ def _view(st):
         "resets_on_sleep": True,
         "realized_sol": round(realized, 6) if st["closed"] else 0.0,
     }
+    return _present(payload)
 
 
 def snapshot():
@@ -1197,15 +1500,24 @@ def set_kill(on):
 
 
 def reset():
-    global _state
+    global _state, _start_priced, START_SOL
     with _lock:
+        apply_ctrl()
+        _start_priced = False
+        START_SOL = 0.0
+        _sync_caps()
         _state = _blank()
-        _log("CHIEF", "模擬倉已重置為 %.0f SOL。之前嘅模擬單清走咗。" % START_SOL, "paper")
+        _load_market(_state)
+        _price_start(_state, force=True)
+        if _state.get("start_sol"):
+            _log("CHIEF", "模擬倉已重置為 %.4f SOL（約 $%.0f）。之前嘅模擬單清走咗。" % (_state["start_sol"], START_USD), "paper")
+        else:
+            _log("CHIEF", "模擬倉已重置。等緊 SOL 報價先至寫低約 $%.0f 嘅起始倉。之前嘅模擬單清走咗。" % START_USD, "paper")
         _tick(_state)
         return _view(_state)
 
 
-_PERSIST = ("started_at", "cash_sol", "positions", "closed", "feed", "seq", "kill", "realized_by")
+_PERSIST = ("started_at", "start_sol", "cash_sol", "positions", "closed", "feed", "seq", "kill", "realized_by")
 
 
 def export_book():
@@ -1217,6 +1529,7 @@ def export_book():
 def import_book(data):
     if not isinstance(data, dict):
         return False
+    global START_SOL, _start_priced
     with _lock:
         st = _book()
         for k in _PERSIST:
@@ -1230,4 +1543,8 @@ def import_book(data):
             st["closed"] = []
         if not isinstance(st.get("feed"), list):
             st["feed"] = []
+        if st.get("start_sol") is not None and not _explicit_start:
+            START_SOL = float(st["start_sol"])
+            _start_priced = START_SOL > 0
+            _sync_caps()
         return True

@@ -6,7 +6,11 @@ import time
 
 from traderapp import pipeline
 
-START_USD = float(os.environ.get("DESK_STOCK_START_USD") or "10000")
+# Public /desk?market=stocks book. MATRIX_STOCKS_V1 had 0 closes; the equity
+# spread is open-cost drag, so the desk uses the CTRL baseline E0-K0-N0-S0.
+STOCK_COMBO = "E0-K0-N0-S0"
+STOCK_BADGE = "主盤 SHOW｜$100｜Demo STOCKS_V1 CTRL"
+START_USD = float(os.environ.get("DESK_STOCK_START_USD") or "100")
 # Buys fill above the Yahoo quote, sells below it. 0.001 = 0.1% per side.
 SLIPPAGE_PER_SIDE = float(os.environ.get("DESK_STOCK_SLIPPAGE_PER_SIDE") or "0.001")
 # Charged on each buy and each sell. A rate, if set, still cannot go under this.
@@ -16,7 +20,7 @@ UNIVERSE = pipeline.LIQUID[:20]
 MAX_POSITIONS = 3
 MAX_ORDER_USD = 2000.0
 MAX_POSITION_PCT = 0.20
-MAX_DAILY_LOSS_PCT = 0.05
+MAX_DAILY_LOSS_PCT = 0.25
 MIN_PRICE = 5.0
 MIN_AVG_VOL = 1_000_000.0
 TP = 0.03
@@ -27,6 +31,37 @@ TICK_SEC = 60
 LIST_TTL = 180
 
 _lock = threading.Lock()
+
+
+def apply_ctrl():
+    """Restore the US-stock CTRL baseline. Does not change env cost knobs."""
+    global TP, SL, MAX_DAILY_LOSS_PCT, MAX_POSITIONS, MAX_POSITION_PCT, MAX_ORDER_USD
+    global MIN_PRICE, MIN_AVG_VOL, GAP_SIGNAL, RVOL_FLAG
+    TP = 0.03
+    SL = 0.015
+    MAX_DAILY_LOSS_PCT = 0.25
+    MAX_POSITIONS = 3
+    MAX_POSITION_PCT = 0.20
+    MAX_ORDER_USD = 2000.0
+    MIN_PRICE = 5.0
+    MIN_AVG_VOL = 1_000_000.0
+    GAP_SIGNAL = 1.5
+    RVOL_FLAG = 2.0
+
+
+def _params():
+    return {
+        "combo": STOCK_COMBO,
+        "tp": TP, "sl": SL, "daily_loss_of_start": MAX_DAILY_LOSS_PCT,
+        "max_daily_loss_pct": MAX_DAILY_LOSS_PCT,
+        "max_positions": MAX_POSITIONS, "max_position_pct": MAX_POSITION_PCT,
+        "max_order_usd": MAX_ORDER_USD, "min_price": MIN_PRICE,
+        "min_avg_vol": MIN_AVG_VOL, "gap_signal": GAP_SIGNAL, "rvol_flag": RVOL_FLAG,
+        "start_usd": START_USD,
+    }
+
+
+apply_ctrl()
 _state = None
 _cache = {}
 
@@ -406,6 +441,57 @@ def _equity(st):
     return st["cash_usd"] + mtm, False
 
 
+def _estimate_equity_usd(st, equity):
+    if equity is not None:
+        return equity
+    cash = st.get("cash_usd")
+    if cash is None:
+        return None
+    total = float(cash)
+    for pos in st.get("positions") or []:
+        if pos.get("value_usd") is not None:
+            total += pos["value_usd"]
+        elif pos.get("cost_usd") is not None and pos.get("upnl_usd") is not None:
+            total += pos["cost_usd"] + pos["upnl_usd"]
+        elif pos.get("cost_usd") is not None:
+            total += pos["cost_usd"]
+        else:
+            return None
+    return total
+
+
+def _present(view):
+    try:
+        from traderapp import paper_store
+        show = paper_store.show_book("stocks")
+    except Exception:
+        show = None
+    if not show:
+        view["badge"] = STOCK_BADGE
+        return view
+    acct = dict(view.get("account") or {})
+    closed_n = show.get("closed") or 0
+    wins = show.get("wins") or 0
+    acct.update({
+        "start_usd": show["start_usd"],
+        "equity_usd": show["equity_usd"],
+        "day_pnl_usd": show["day_pnl_usd"],
+        "cash_usd": show["cash_usd"] if show.get("cash_usd") is not None else acct.get("cash_usd"),
+        "quote_missing": False,
+        "mirror": True,
+        "wins": wins,
+        "closed": closed_n,
+        "open": show.get("open") or 0,
+        "win_rate": None if not closed_n else round(wins / float(closed_n), 4),
+        "win_rate_text": None if closed_n else "未有已平倉交易",
+    })
+    view["account"] = acct
+    view["positions"] = show.get("positions") or []
+    view["mirror"] = True
+    view["badge"] = STOCK_BADGE
+    return view
+
+
 def _close(st, pos, reason, bot):
     plan = _plan_sell(pos.get("last_usd"), pos.get("qty"))
     if plan is None:
@@ -581,12 +667,12 @@ def _tick(st):
 
 def _rules():
     return [
-        "掃描：Yahoo 5 日日線，預設 %d 隻流動美股。排名用真實缺口（最新收市對上日收市）。" % len(UNIVERSE),
+        "主盤係美股 Demo V1 CTRL %s。掃描：Yahoo 5 日日線，預設 %d 隻流動美股。排名用真實缺口（最新收市對上日收市）。" % (STOCK_COMBO, len(UNIVERSE)),
         "狙擊只喺紐約正規時段（09:30–16:00）先考慮落單：缺口至少 %+.1f%% 而且高過上日收市，或者 15 分鐘開市區間之後有 5 分鐘線收高過區間高位。" % GAP_SIGNAL,
         "風險檢查：股價至少 $%.0f，之前幾日平均成交至少 %s 股。如果新聞標題提到 earnings 就避開嗰隻。冇新聞就唔當作業績日。" % (MIN_PRICE, "{:,.0f}".format(MIN_AVG_VOL)),
         "大戶：今日成交量除以前幾日平均（相對成交量）。公開 Yahoo 圖冇單一錢包。",
         "搜尋：只對焦點股票讀 trader-news 標題。國會崗位讀眾議院公開申報（預設 Pelosi），唔係即時內幕。",
-        "風控：起始金額睇 DESK_STOCK_START_USD（預設 $%.0f）。每倉最多 %.0f%% 或 $%.0f。最多 %d 個倉。模擬虧損去到起始 %.0f%% 就停止。" % (
+        "風控：起始 $%.0f。每倉最多 %.0f%% 或 $%.0f，邊個細用邊個。最多 %d 個倉。模擬虧損去到起始 %.0f%% 就停止。" % (
             START_USD, MAX_POSITION_PCT * 100, MAX_ORDER_USD, MAX_POSITIONS, MAX_DAILY_LOSS_PCT * 100),
         "執行：模擬 +%.1f%% 止賺，-%.1f%% 止蝕。紐約 15:50 後用當刻報價決定平倉。可以碎股。%s" % (TP * 100, SL * 100, _costs_note()),
         "唔係正規時段唔會開新模擬倉。模擬倉喺網頁進程入面，瞓着會清走；命令列 runner 先會寫入檔案。",
@@ -597,6 +683,7 @@ def _view(st):
     sess = st.get("session") or session_now()
     equity, missing = _equity(st)
     start = st["start_usd"]
+    equity_mark = _estimate_equity_usd(st, equity)
     wins = sum(1 for c in st["closed"] if c["pnl_usd"] > 0)
     closed_n = len(st["closed"])
     rows = st.get("rows") or st.get("quotes") or []
@@ -686,13 +773,14 @@ def _view(st):
             None, None, "申報可以遲 45 日，唔係內幕快訊，亦唔落單", "working" if filings else "idle"),
     ]
     # fix search focus symbol helper used above — defined below if name error
-    return {
+    payload = {
         "now": _iso(), "paper": True, "market": "stocks", "brand": "SPIDEY 交易台",
+        "badge": STOCK_BADGE, "combo": STOCK_COMBO, "params": _params(),
         "session": sess,
         "account": {
             "currency": "USD", "start_usd": start, "cash_usd": round(st["cash_usd"], 2),
-            "equity_usd": None if equity is None else round(equity, 2),
-            "day_pnl_usd": None if equity is None else round(equity - start, 2),
+            "equity_usd": None if equity_mark is None else round(equity_mark, 2),
+            "day_pnl_usd": None if equity_mark is None else round(equity_mark - start, 2),
             "wins": wins, "closed": closed_n,
             "win_rate": None if not closed_n else round(wins / float(closed_n), 4),
             "win_rate_text": None if closed_n else "未有已平倉交易",
@@ -721,6 +809,7 @@ def _view(st):
             "note": _costs_note(),
         },
     }
+    return _present(payload)
 
 
 def news_sym_of(st):
@@ -763,8 +852,9 @@ def set_kill(on):
 def reset():
     global _state
     with _lock:
+        apply_ctrl()
         _state = _blank()
-        _log("CHIEF", "美股模擬倉已重置為 $%.2f。" % _state["start_usd"], "paper")
+        _log("CHIEF", "美股模擬倉已重置為 $%.2f。之前嘅模擬單清走咗。" % _state["start_usd"], "paper")
         _tick(_state)
         return _view(_state)
 
