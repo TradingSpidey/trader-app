@@ -66,7 +66,7 @@ function spark(candles) {
   const y = (v) => p + (h - p * 2) * (hi - v) / (hi - lo);
   const line = cs.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
   const up = cs[cs.length - 1] >= cs[0];
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="公開 5 分鐘收市價"><path d="${line}" fill="none" stroke="${up ? "#3dffb0" : "#ff5d7a"}" stroke-width="2"/></svg>`;
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="公開 5 分鐘收市價"><path d="${line}" fill="none" stroke="${up ? "#2fce85" : "#ff5d6c"}" stroke-width="2"/></svg>`;
 }
 
 let market = new URLSearchParams(location.search).get("market") === "stocks" ? "stocks" : "crypto";
@@ -111,37 +111,75 @@ function person(id) {
   </svg>`;
 }
 
-const SPOTS = {scan:[16,28], sniper:[250,28], whale:[640,28], search:[880,28], chief:[445,188], rug:[16,340], exit:[250,340], risk:[640,340], dev:[880,340]};
+const CREW = ["scan", "sniper", "whale", "search", "chief", "rug", "exit", "risk", "dev"];
+const CREW_COLOR = {scan:"#3ee0ff",sniper:"#ffc14d",whale:"#7aa2ff",search:"#c58bff",rug:"#ff5d7a",exit:"#3dffb0",risk:"#ff9f43",dev:"#ff4d9a",chief:"#c5d4e4"};
 
-function bubble(b) {
-  const t = String(b.bubble || b.status || "").replace(/。/g, "");
-  return t.length > 26 ? t.slice(0, 26) + "…" : t;
-}
 function pose(b) {
   if (b.id === "rug" && (b.tone === "block" || String(b.status).indexOf("擋") >= 0)) return "shield";
   if (b.id === "whale") return "look";
   if (b.tone === "idle") return "idle";
   return "work";
 }
+function toneBadge(tone) {
+  if (tone === "block") return ["警示", "block"];
+  if (tone === "idle") return ["待機", "idle"];
+  return ["工作中", "working"];
+}
+function taskText(b) {
+  const raw = b.bubble || b.status || "";
+  const text = String(raw).trim();
+  return text || "待機";
+}
+function detailText(b) {
+  const parts = [];
+  if (b.detail) parts.push(String(b.detail).trim());
+  const sym = b.focus && (b.focus.symbol || b.focus.name);
+  if (sym) parts.push(String(sym));
+  (b.metrics || []).forEach((m) => {
+    if (parts.length >= 3 || !m) return;
+    if (m.value == null || m.value === "" || m.value === "暫無數據") return;
+    parts.push(String(m.label) + " " + String(m.value));
+  });
+  return parts.filter(Boolean).join(" · ") || "待機";
+}
+function chiefBot(j) {
+  const chief = j.chief || {};
+  const route = chief.route || [];
+  const account = j.account || {};
+  const open = account.open == null ? "—" : String(account.open);
+  return {
+    id: "chief",
+    en: "CHIEF",
+    name: "主管",
+    status: route.length ? route.join(" → ") : (chief.status || "值班"),
+    detail: "持倉 " + open + " · " + (chief.status || "值班"),
+    tone: account.kill ? "block" : "working",
+    metrics: [],
+    candles: null,
+  };
+}
 function drawOffice(j) {
-  const bots = (j.bots || []).slice();
-  const chief = {id:"chief", en:"CHIEF", name:"主管", status:(j.chief && j.chief.status) || "值班", tone:"work", bubble:(j.chief && (j.chief.route || [])[0]) || "值班"};
-  const all = bots.concat([chief]);
+  const byId = {};
+  (j.bots || []).forEach((b) => { if (b && b.id) byId[b.id] = b; });
+  byId.chief = chiefBot(j);
+  const all = CREW.map((id) => byId[id]).filter(Boolean);
   $("#office").innerHTML = all.map((b) => {
-    const xy = SPOTS[b.id] || [40, 40];
-    const mini = (b.candles || []).slice(-12);
-    let line = "";
-    if (mini.length >= 2) {
-      const cs = mini.map((c) => c.c);
-      const lo = Math.min(...cs), hi = Math.max(...cs) || 1;
-      const span = hi - lo || 1;
-      line = cs.map((v, i) => `${i ? "L" : "M"}${(4 + i * 90 / (cs.length - 1)).toFixed(1)},${(28 - (v - lo) / span * 20).toFixed(1)}`).join("");
-    }
-    return `<button type="button" class="station" data-id="${esc(b.id)}" style="left:${xy[0]}px;top:${xy[1]}px;--c:${({scan:"#3ee0ff",sniper:"#ffc14d",whale:"#7aa2ff",search:"#c58bff",rug:"#ff5d7a",exit:"#3dffb0",risk:"#ff9f43",dev:"#ff4d9a",chief:"#e8fbff"})[b.id]}">
-      <div class="bubble">${esc(bubble(b))}</div>
-      ${person(b.id).replace('class="person"', `class="person ${pose(b)}"`)}
-      <div class="desklet">${line ? `<svg viewBox="0 0 100 32"><path d="${line}" fill="none" stroke="currentColor" stroke-width="2"/></svg>` : ""}</div>
-      <div class="label"><em>${esc(b.en || "")}</em>${esc(b.name || "主管")}</div>
+    const [toneText, toneCls] = toneBadge(b.tone);
+    const task = taskText(b);
+    const hasChart = (b.candles || []).filter((c) => c && c.c != null).length >= 2;
+    const chart = hasChart ? spark(b.candles) : `<p class="muted flatline">暫無走勢</p>`;
+    const chief = b.id === "chief" ? " is-chief" : "";
+    return `<button type="button" class="station${chief}" data-id="${esc(b.id)}" style="--c:${CREW_COLOR[b.id] || "#c5d4e4"}" aria-label="${esc((b.en || "") + " " + (b.name || "") + " " + task)}">
+      <div class="station-ava">${person(b.id).replace('class="person"', `class="person ${pose(b)}"`)}</div>
+      <div class="station-body">
+        <div class="station-top">
+          <div class="label"><em>${esc(b.en || "")}</em><b>${esc(b.name || "主管")}</b></div>
+          <span class="tag tone-badge ${toneCls}">${toneText}</span>
+        </div>
+        <p class="task"><span class="k">任務</span>${esc(task)}</p>
+        <p class="station-detail"><span class="k">詳情</span>${esc(detailText(b))}</p>
+        ${chart}
+      </div>
     </button>`;
   }).join("");
   $("#office").querySelectorAll(".station").forEach((el) => el.addEventListener("click", () => openDetail(j, el.dataset.id)));
@@ -153,7 +191,7 @@ function openDetail(j, id) {
   if (!b) { box.hidden = true; return; }
   box.hidden = false;
   box.className = "detail-pop panel";
-  box.innerHTML = `<h2>${esc(b.name || "主管")}</h2><p>${esc(b.status || "")}</p><p class="muted">${esc(b.detail || "")}</p><dl class="metrics">${(b.metrics || []).map(metric).join("")}</dl><button type="button" id="detail-x">關閉</button>`;
+  box.innerHTML = `<h2>${esc(b.name || "主管")}</h2><p>${esc(b.status || "")}</p><p class="muted">${esc(b.detail || "")}</p><dl class="metrics">${(b.metrics || []).map(metric).join("")}</dl><button type="button" class="ghost" id="detail-x">關閉</button>`;
   $("#detail-x").addEventListener("click", () => { box.hidden = true; });
 }
 function maybeAct(j) {
@@ -212,6 +250,8 @@ function render(j) {
   if (demo) demo.textContent = market === "stocks" ? "網站示範盤（預設 $10,000，Render 休眠會重置）" : "網站示範盤（10 SOL，Render 休眠會重置）";
   $("#m-crypto").classList.toggle("on", market !== "stocks");
   $("#m-stocks").classList.toggle("on", market === "stocks");
+  $("#m-crypto").setAttribute("aria-selected", market !== "stocks" ? "true" : "false");
+  $("#m-stocks").setAttribute("aria-selected", market === "stocks" ? "true" : "false");
   const sess = j.session;
   $("#session-line").textContent = sess ? `美股${sess.phase} · 紐約 ${sess.et} · 香港 ${sess.hkt} · 正規 ${sess.hours_hkt}` : "";
   $("#tape-age").textContent = j.market_age_sec == null ? "" : "更新於 " + j.market_age_sec + " 秒前";

@@ -39,14 +39,16 @@ curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: ap
 
 `stocks` is the other book name. The page is `/paper`. If `PAPER_INGEST_TOKEN` is unset the ingest endpoint returns 503.
 
-The same token accepts the latest D01–D10 demo leaderboard (overwrite). No new environment variable:
+The same token accepts the crypto demo leaderboard and the US-stock demo leaderboard (each overwrite). No new environment variable:
 
 ```bash
 curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: application/json" \
   --data-binary @leaderboard.json https://<host>/api/paper/ingest/leaderboard
+curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: application/json" \
+  --data-binary @leaderboard_stocks.json https://<host>/api/paper/ingest/leaderboard_stocks
 ```
 
-`GET /api/paper` adds `leaderboard` (`null` before the first push). The ranked table is on `/paper` and `/paper/demo`. The snapshot is `PAPER_STORE_DIR/leaderboard.json` (default `/tmp/paper_store`), same ephemeral disk as the two books: a restart drops it until the always-on machine pushes again.
+`GET /api/paper` adds `leaderboard` and `leaderboard_stocks` (`null` before the first push). Crypto ranks are on `/paper` and `/paper/demo` (78 本 · 角色交叉組合 V6). US-stock ranks are on `/paper/demo/stocks` (36 本 · 美股交叉組合 V1). Snapshots are `PAPER_STORE_DIR/leaderboard.json` and `leaderboard_stocks.json` (default `/tmp/paper_store`), same ephemeral disk as the two books: a restart drops them until the always-on machine pushes again.
 
 `/paper` renders `crypto.data.funnel` when the always-on engine includes it: Scout→Filter→Analyst→Sniper→Guard counts (`seen` / `passed` / `skipped`) and the skipped/copied event log. Those numbers are the engine's own counts. Until a funnel object arrives, the section stays on the waiting line. `/paper/demo` does not show the funnel.
 

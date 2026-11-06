@@ -72,8 +72,8 @@ function chart(pts) {
   const y = (v) => pad + (h - pad * 2) * (hi - v) / span;
   const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
   const up = pts[pts.length - 1].v >= pts[0].v;
-  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="權益曲線"><path d="${line}" fill="none" stroke="${up ? "#3dffb0" : "#ff5d7a"}" stroke-width="2"/>
-    <text x="8" y="14" fill="#8ea3b8" font-size="12">${esc(usd(lo, 2))} → ${esc(usd(hi, 2))}</text></svg>
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="權益曲線"><path d="${line}" fill="none" stroke="${up ? "#2fce85" : "#ff5d6c"}" stroke-width="2"/>
+    <text x="8" y="14" fill="#9aa6b5" font-size="12">${esc(usd(lo, 2))} → ${esc(usd(hi, 2))}</text></svg>
     <p class="note">${esc(pts[0].label)} → ${esc(pts[pts.length - 1].label)} · ${pts.length} 點</p>`;
 }
 
@@ -152,8 +152,32 @@ function bookCombo(b) {
   if (raw == null || raw === "") return "";
   return String(raw);
 }
-function matrixWait(bookCount) {
+function comboBadge(combo) {
+  if (!combo) return "";
+  return `<span class="combo">${esc(combo)}</span>`;
+}
+function bookFamily(b) {
+  if (!b || typeof b !== "object") return "";
+  const fromBook = b.family;
+  const fromParams = b.params && typeof b.params === "object" ? b.params.family : "";
+  const raw = fromBook != null && fromBook !== "" ? fromBook : fromParams;
+  if (raw == null || raw === "") return "";
+  return String(raw);
+}
+function familyBadge(family) {
+  if (!family) return "";
+  return `<span class="combo family">${esc(family)}</span>`;
+}
+let boardMarket = "crypto";
+function kpi(label, value) {
+  return `<div class="kpi"><span>${esc(label)}</span><b class="num">${value}</b></div>`;
+}
+function matrixWait(bookCount, market) {
   const n = Number(bookCount);
+  if (market === "stocks") {
+    const count = Number.isFinite(n) && n > 0 ? String(Math.trunc(n)) : "36";
+    return count + " 本美股交叉組合（CTRL + SX/QX/AX/ZX）";
+  }
   const count = Number.isFinite(n) && n > 0 ? String(Math.trunc(n)) : "78";
   return count + " 本交叉組合（CTRL + CX/QX/AX/ZX）";
 }
@@ -174,44 +198,55 @@ function shortParams(p, combo) {
 
 function demoBookDetail(b) {
   const combo = bookCombo(b);
+  const family = bookFamily(b);
+  const stocks = boardMarket === "stocks";
   const positions = Array.isArray(b.positions) ? b.positions : [];
   const trades = (Array.isArray(b.trades) ? b.trades.slice() : []).sort((a, c) => (parseTime(c.time_hkt || c.ts) || 0) - (parseTime(a.time_hkt || a.ts) || 0));
   const posRows = positions.map((p) => `<tr>
-    <td><b>${esc(p.symbol)}</b><div class="muted">${esc(shortMint(p.mint))}</div></td>
+    <td><b>${esc(p.symbol)}</b>${p.mint ? `<div class="muted">${esc(shortMint(p.mint))}</div>` : ""}</td>
     <td class="num">${usd(p.entry_usd)}</td>
     <td class="num">${usd(p.last_usd)}</td>
     <td class="num ${cls(p.ret)}">${pctFrac(p.ret)}</td>
-    <td class="num">${sol(p.value_sol)}</td>
-    <td class="num ${cls(p.upnl_sol)}">${sol(p.upnl_sol)}</td>
+    <td class="num">${stocks ? usd(p.value_usd) : sol(p.value_sol)}</td>
+    <td class="num ${stocks ? cls(p.upnl_usd) : cls(p.upnl_sol)}">${stocks ? usd(p.upnl_usd) : sol(p.upnl_sol)}</td>
     <td class="num">${esc(fmtHKT(p.opened_at))}</td>
     <td>${esc(p.why || p.reason || "暫無數據")}</td>
   </tr>`).join("");
   const tradeRows = trades.map((t) => {
-    const pnl = t.pnl_sol;
+    const pnl = stocks ? (t.pnl != null && t.pnl !== "" ? t.pnl : t.pnl_usd) : t.pnl_sol;
+    const price = stocks ? (t.price != null && t.price !== "" ? t.price : t.price_usd) : t.price_usd;
     return `<tr>
       <td class="num">${esc(fmtHKT(t.time_hkt || t.ts))}</td>
       <td>${esc(sideName(t.side || t.action))}</td>
       <td>${esc(t.symbol)}</td>
-      <td class="num">${usd(t.price_usd)}</td>
+      <td class="num">${usd(price)}</td>
       <td class="num">${esc(dash(t.qty != null && t.qty !== "" ? t.qty : t.sol))}</td>
       <td>${esc(dash(t.reason))}</td>
       <td class="num ${cls(Number(pnl))}">${pnl == null || pnl === "" ? "—" : esc(String(pnl))}</td>
     </tr>`;
   }).join("");
+  const valueHead = stocks ? "市值（美元）" : "市值";
+  const upHead = stocks ? "浮動（美元）" : "浮動";
   return `<article class="card lb-book" id="book-${esc(b.id || "")}">
-    <h3>${esc(b.id || "—")} · ${esc(b.label || "—")}${combo ? ` · ${esc(combo)}` : ""}</h3>
+    <h3><span class="num">${esc(b.id || "—")}</span> ${esc(b.label || "—")}${comboBadge(combo)}${familyBadge(family)}</h3>
     <p class="note">權益 ${usd(b.equity_usd, 2)} · 回報 ${pctPoints(b.ret_pct)} · 持倉 ${esc(String(b.open_positions == null ? positions.length : b.open_positions))} · 贏/平 ${esc(dash(b.wins))} / ${esc(dash(b.closed))}</p>
-    <h4>持倉</h4>
-    ${positions.length ? `<div class="scroll"><table><thead><tr><th>代號</th><th>入場</th><th>而家</th><th>回報</th><th>市值</th><th>浮動</th><th>開倉（香港）</th><th>原因</th></tr></thead><tbody>${posRows}</tbody></table></div>` : `<p class="muted">未有持倉</p>`}
-    <h4 style="margin-top:10px">成交</h4>
-    ${trades.length ? `<div class="scroll"><table><thead><tr><th>時間（香港）</th><th>方向</th><th>代號</th><th>價格</th><th>數量</th><th>原因</th><th>盈虧</th></tr></thead><tbody>${tradeRows}</tbody></table></div>` : `<p class="muted">未有成交</p>`}
+    <section class="book-sec" aria-label="持倉">
+      <h4>持倉</h4>
+      ${positions.length ? `<div class="scroll"><table><thead><tr><th>代號</th><th>入場</th><th>而家</th><th>回報</th><th>${valueHead}</th><th>${upHead}</th><th>開倉（香港）</th><th>原因</th></tr></thead><tbody>${posRows}</tbody></table></div>` : `<p class="muted">未有持倉</p>`}
+    </section>
+    <section class="book-sec" aria-label="成交">
+      <h4>成交</h4>
+      ${trades.length ? `<div class="scroll"><table><thead><tr><th>時間（香港）</th><th>方向</th><th>代號</th><th>價格</th><th>數量</th><th>原因</th><th>盈虧</th></tr></thead><tbody>${tradeRows}</tbody></table></div>` : `<p class="muted">未有成交</p>`}
+    </section>
   </article>`;
 }
 
 
-function leaderboardHtml(item) {
+function leaderboardHtml(item, market) {
+  boardMarket = market === "stocks" ? "stocks" : "crypto";
+  const blanks = `<div class="kpis lb-kpis">${kpi("帳本", "—")}${kpi("已啟動", "—")}${kpi("起始", "—")}${kpi("更新（香港）", "—")}</div>`;
   if (!item || !item.data || typeof item.data !== "object") {
-    return `<p class="muted">等緊 Demo 排行榜傳上嚟。${esc(matrixWait())}會喺度按名次排。</p>`;
+    return `${blanks}<p class="muted">等緊 Demo 排行榜傳上嚟。${esc(matrixWait(undefined, boardMarket))}會喺度按名次排。</p>`;
   }
   const d = item.data;
   const received = parseTime(item.received_at);
@@ -234,7 +269,7 @@ function leaderboardHtml(item) {
   const norm = (s) => s.replace(/[。．.\s]/g, "");
   const extraHtml = extra && norm(extra) !== norm("模擬盤，唔係真錢，唔係投資建議")
     ? `<p class="note">${esc(extra)}</p>` : "";
-  const body = rows.length ? `<div class="scroll"><table class="lb"><thead><tr>
+  const body = rows.length ? `<div class="scroll lb-scroll"><table class="lb"><thead><tr>
       <th>排名</th><th>編號</th><th>名稱</th><th>權益（美元）</th><th>回報</th><th>贏 / 平倉</th><th>Kill / 狀態</th><th>參數</th>
     </tr></thead><tbody>${rows.map((b) => {
       const rank = rankNum(b);
@@ -249,17 +284,18 @@ function leaderboardHtml(item) {
       return `<tr class="${idle ? "idle" : ""} ${killed ? "killed" : ""}">
         <td class="num">${rank == null ? "—" : esc(String(rank))}</td>
         <td class="num">${esc(b.id || "—")}</td>
-        <td><b>${esc(b.label || "—")}</b>${combo ? `<div class="muted">${esc(combo)}</div>` : ""}${b.note ? `<div class="muted">${esc(b.note)}</div>` : ""}</td>
+        <td><b>${esc(b.label || "—")}</b>${comboBadge(combo)}${familyBadge(bookFamily(b))}${b.note ? `<div class="muted">${esc(b.note)}</div>` : ""}</td>
         <td class="num">${usd(b.equity_usd, 2)}</td>
         <td class="num ${cls(ret)}">${pctPoints(b.ret_pct)}${b.ret_sol_pct == null || b.ret_sol_pct === "" ? "" : `<div class="muted">SOL ${esc(pctPoints(b.ret_sol_pct))}</div>`}</td>
         <td class="num">${esc(wins)} / ${esc(closed)}${b.open_positions == null || b.open_positions === "" ? "" : `<div class="muted">持倉 ${esc(String(b.open_positions))}</div>`}</td>
         <td>${kill}<div class="${tone}">${esc(statusLabel(b.status))}</div></td>
         <td class="params">${esc(shortParams(b.params, combo))}</td>
       </tr>`;
-    }).join("")}</tbody></table></div>` : `<p class="muted">未有帳本。${esc(matrixWait(d.book_count))}會喺度按名次排。</p>`;
+    }).join("")}</tbody></table></div>` : `<p class="muted">未有帳本。${esc(matrixWait(d.book_count, boardMarket))}會喺度按名次排。</p>`;
   const details = rows.map(demoBookDetail).join("");
-  return `<div class="lb-head">
-      <p class="note">更新（香港）<b class="num">${esc(updated)}</b></p>
+  const shown = `<div class="kpis lb-kpis">${kpi("帳本", esc(dash(d.book_count != null ? d.book_count : rows.length)))}${kpi("已啟動", esc(dash(d.initialized_count)))}${kpi("起始", esc(start))}${kpi("更新（香港）", esc(updated))}</div>`;
+  return `${shown}<div class="lb-head">
+      <p class="note">今次顯示 <b class="num">${rows.length}</b> 本</p>
       <p class="note">起始 ${esc(start)}${counts}${stale ? ` · <span class="stale">數據可能過時（我部電腦暫停中）</span>` : ` · ${esc(ago(received))}`}</p>
     </div>
     ${extraHtml}
@@ -270,7 +306,9 @@ function leaderboardHtml(item) {
 
 function bookCard(name, book, item) {
   if (!item || !item.data) {
-    return `<article class="card"><h2>${esc(name)}</h2><p>等緊數據傳上嚟</p></article>`;
+    return `<article class="card book-card"><h2>${esc(name)}</h2>
+      <div class="kpis">${kpi("而家權益（美元）", "—")}${kpi("回報", "—")}${kpi("已實現", "—")}${kpi("未實現", "—")}</div>
+      <p class="muted">等緊數據傳上嚟</p></article>`;
   }
   const d = item.data;
   const cfg = d.config || {};
@@ -305,7 +343,7 @@ function bookCard(name, book, item) {
       <td class="num ${cls(Number(pnl))}">${pnl == null || pnl === "" ? "—" : esc(String(pnl))}</td>
     </tr>`;
   }).join("");
-  return `<article class="card">
+  return `<article class="card book-card">
     <h2>${esc(name)}</h2>
     <p class="note">起始 <b class="num">$50</b> · ${esc(fmtHKT(cfg.start_time_hkt))} 開始${crypto && cfg.start_sol != null ? `（${esc(num(cfg.start_sol, 4))} SOL）` : ""}</p>
     ${stale ? `<div class="stale">數據可能過時（我部電腦暫停中）</div>` : ""}
@@ -320,12 +358,12 @@ function bookCard(name, book, item) {
       <div class="kpi"><span>買入 / 賣出</span><b class="num">${dash(d.buys)} / ${dash(d.sells)}</b></div>
       <div class="kpi"><span>勝率</span><b>${winLine(d)}</b></div>
     </div>
-    <h2 style="margin-top:12px">權益曲線</h2>
-    ${chart(equityPoints(book, d))}
-    <h2>持倉</h2>
-    ${positions.length ? `<div class="scroll"><table><thead><tr><th>代號</th><th>入場</th><th>而家</th><th>回報</th><th>市值</th><th>浮動</th><th>開倉（香港）</th><th>原因</th></tr></thead><tbody>${posRows}</tbody></table></div>` : `<p class="muted">未有持倉</p>`}
-    <h2 style="margin-top:12px">成交</h2>
-    ${trades.length ? `<div class="scroll"><table><thead><tr><th>時間（香港）</th><th>方向</th><th>代號</th><th>價格</th><th>數量</th><th>原因</th><th>盈虧</th></tr></thead><tbody>${tradeRows}</tbody></table></div>` : `<p class="muted">未有成交</p>`}
+    <section class="book-sec" aria-label="權益曲線"><h3>權益曲線</h3>
+    ${chart(equityPoints(book, d))}</section>
+    <section class="book-sec" aria-label="持倉"><h4>持倉</h4>
+    ${positions.length ? `<div class="scroll"><table><thead><tr><th>代號</th><th>入場</th><th>而家</th><th>回報</th><th>市值</th><th>浮動</th><th>開倉（香港）</th><th>原因</th></tr></thead><tbody>${posRows}</tbody></table></div>` : `<p class="muted">未有持倉</p>`}</section>
+    <section class="book-sec" aria-label="成交"><h4>成交</h4>
+    ${trades.length ? `<div class="scroll"><table><thead><tr><th>時間（香港）</th><th>方向</th><th>代號</th><th>價格</th><th>數量</th><th>原因</th><th>盈虧</th></tr></thead><tbody>${tradeRows}</tbody></table></div>` : `<p class="muted">未有成交</p>`}</section>
     <p class="note">成本假設：${esc(cost)}</p>
     ${cfg.trading_hours ? `<p class="note">${esc(cfg.trading_hours)}</p>` : ""}
   </article>`;
@@ -336,7 +374,9 @@ function funnelHtml(item) {
   const data = item && item.data ? item.data : item;
   const f = data && data.funnel;
   if (!f || !Array.isArray(f.stages) || !f.stages.length) {
-    return `<p class="muted">等緊 Copy Funnel 傳上嚟（引擎會推 Scout→Filter→Analyst→Sniper→Guard）。</p>`;
+    const names = ["Scout", "Filter", "Analyst", "Sniper", "Guard"];
+    const stages = names.map((n) => `<div class="funnel-stage"><b>${n}</b><div class="counts">見過 — · 過 — · 跳過 —</div></div>`).join("");
+    return `<p class="muted">等緊 Copy Funnel 傳上嚟（引擎會推 Scout→Filter→Analyst→Sniper→Guard）。</p><div class="funnel-stages">${stages}</div>`;
   }
   const scout = f.scout || (data && data.scout) || {};
   const stages = f.stages.map((s) => `<div class="funnel-stage">
@@ -365,13 +405,24 @@ async function load() {
   const r = await fetch("/api/paper");
   if (!r.ok) throw new Error("讀唔到成績");
   const j = await r.json();
+  const pageMarket = document.body && document.body.dataset.market === "stocks" ? "stocks" : "crypto";
   const lb = $("#leaderboard");
-  if (lb) lb.innerHTML = leaderboardHtml(j && j.leaderboard);
+  if (lb) {
+    lb.innerHTML = leaderboardHtml(pageMarket === "stocks" ? j.leaderboard_stocks : j.leaderboard, pageMarket);
+    lb.removeAttribute("aria-busy");
+  }
   const funnel = $("#funnel");
   if (funnel) funnel.innerHTML = funnelHtml(j && j.crypto);
   const books = $("#books");
   if (books) books.innerHTML = `<div class="books">${bookCard("加密貨幣", "crypto", j.crypto)}${bookCard("美股", "stocks", j.stocks)}</div>`;
 }
+function tickClock() {
+  const el = $("#clock");
+  if (!el) return;
+  el.textContent = new Intl.DateTimeFormat("zh-HK", {timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"}).format(new Date()) + " HKT";
+}
+tickClock();
+setInterval(tickClock, 1000);
 load().catch((e) => {
   const lb = $("#leaderboard");
   if (lb) lb.textContent = e.message;
