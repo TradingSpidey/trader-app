@@ -1450,7 +1450,9 @@ def _view(st):
         "positions": [{
             "symbol": p["symbol"], "mint": p["mint"], "qty": _sig(p["qty"]),
             "entry_usd": _sig(p["entry_usd"]), "last_usd": _sig(p.get("last_usd")),
-            "cost_sol": round(p["cost_sol"], 6), "upnl_sol": None if p.get("upnl_sol") is None else round(p["upnl_sol"], 6),
+            "cost_sol": round(p["cost_sol"], 6),
+            "upnl_sol": None if p.get("upnl_sol") is None else round(p["upnl_sol"], 6),
+            "upnl_usd": None if p.get("upnl_sol") is None or not sol else round(float(p["upnl_sol"]) * float(sol), 2),
             "ret_pct": None if p.get("ret") is None else round(p["ret"] * 100, 2),
             "why": p.get("why"), "source": p.get("source"), "opened_at": p.get("opened_at"),
         } for p in st["positions"]],
