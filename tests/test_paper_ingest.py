@@ -275,6 +275,89 @@ class PaperIngestTests(unittest.TestCase):
         self.assertNotIn(b'id="funnel"', demo.data)
         self.assertIn(b'id="leaderboard"', demo.data)
 
+    def test_stocks_leaderboard_is_separate(self):
+        missing = self.client.post("/api/paper/ingest/leaderboard_stocks", data=b"{}", content_type="application/json")
+        self.assertEqual(missing.status_code, 503)
+        os.environ["PAPER_INGEST_TOKEN"] = "correct-token"
+        headers = {"Authorization": "Bearer correct-token", "Content-Type": "application/json"}
+        bad = self.client.post(
+            "/api/paper/ingest/leaderboard_stocks", data=b"{}", headers={"Authorization": "Bearer nope"})
+        self.assertEqual(bad.status_code, 401)
+        not_list = self.client.post(
+            "/api/paper/ingest/leaderboard_stocks", data=json.dumps({"books": "nope"}), headers=headers)
+        self.assertEqual(not_list.status_code, 400)
+        crypto_books = [{"id": "C0", "label": "crypto", "combo": "CX", "rank": 1, "equity_usd": 50, "positions": [], "trades": []}]
+        crypto = self.client.post(
+            "/api/paper/ingest/leaderboard",
+            data=json.dumps({"book_count": 1, "books": crypto_books, "matrix_version": 6}),
+            headers=headers)
+        self.assertEqual(crypto.status_code, 200)
+        self.assertEqual(crypto.get_json()["book"], "leaderboard")
+        books = []
+        for i in range(36):
+            books.append({
+                "id": "S%02d" % i,
+                "label": "stock-%d" % i,
+                "combo": "E1K0N1S0",
+                "family": "SX" if i else "CTRL",
+                "rank": i + 1,
+                "initialized": True,
+                "status": "running",
+                "kill": False,
+                "equity_usd": 50,
+                "ret_pct": 0,
+                "wins": 0,
+                "closed": 0,
+                "positions": [],
+                "trades": [],
+                "params": {"combo": "E1K0N1S0", "family": "SX" if i else "CTRL"},
+            })
+        books[0]["positions"] = [{"symbol": "AVGO", "entry_usd": 10, "last_usd": 11, "ret": 0.1, "value_usd": 11, "upnl_usd": 1}]
+        books[0]["trades"] = [{"symbol": "AVGO", "side": "buy", "price": 10, "qty": 1, "pnl_usd": None, "reason": "fixture"}]
+        payload = {
+            "market": "stocks",
+            "matrix_version": 1,
+            "book_count": 36,
+            "updated_hkt": "2026-11-06 21:10:00 HKT",
+            "books": books,
+        }
+        res = self.client.post("/api/paper/ingest/leaderboard_stocks", data=json.dumps(payload), headers=headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["book"], "leaderboard_stocks")
+        self.assertEqual(res.get_json()["books"], 36)
+        paper_store.reset_memory()
+        body = self.client.get("/api/paper").get_json()
+        self.assertEqual(body["leaderboard"]["data"]["books"][0]["id"], "C0")
+        board = body["leaderboard_stocks"]["data"]
+        self.assertEqual(board["market"], "stocks")
+        self.assertEqual(board["matrix_version"], 1)
+        self.assertEqual(board["book_count"], 36)
+        self.assertEqual(len(board["books"]), 36)
+        self.assertEqual([b["id"] for b in board["books"]], ["S%02d" % i for i in range(36)])
+        self.assertEqual(board["books"][0]["family"], "CTRL")
+        self.assertEqual(board["books"][0]["combo"], "E1K0N1S0")
+        self.assertEqual(board["books"][0]["positions"][0]["symbol"], "AVGO")
+        self.assertEqual(board["books"][0]["trades"][0]["side"], "buy")
+        self.assertEqual(board["books"][-1]["id"], "S35")
+        page = self.client.get("/paper")
+        self.assertIn("美股 Demo 排行".encode(), page.data)
+        self.assertIn(b'href="/paper/demo/stocks"', page.data)
+        stocks = self.client.get("/paper/demo/stocks")
+        self.assertEqual(stocks.status_code, 200)
+        text = stocks.data.decode()
+        title = "Demo 排行榜（36 本 · 美股交叉組合 V1）"
+        sub = "CTRL 對照；SX＝E×K×N×S0；QX＝S1 品質；AX＝S2 進攻；ZX＝邊角／N2 歸因"
+        self.assertEqual(text.count(title), 3)
+        self.assertIn(sub, text)
+        self.assertIn("模擬盤，唔係真錢，唔係投資建議", text)
+        self.assertIn('data-market="stocks"', text)
+        self.assertNotIn('id="books"', text)
+        self.assertNotIn('id="funnel"', text)
+        self.assertIn('id="leaderboard"', text)
+        crypto_page = self.client.get("/paper/demo").data.decode()
+        self.assertEqual(crypto_page.count("Demo 排行榜（78 本 · 角色交叉組合 V6）"), 3)
+        self.assertNotIn(title, crypto_page)
+
 
 if __name__ == "__main__":
     unittest.main()

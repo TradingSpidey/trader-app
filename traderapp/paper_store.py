@@ -6,9 +6,10 @@ from datetime import datetime, timezone
 
 BOOKS = ("crypto", "stocks")
 LEADERBOARD = "leaderboard"
+LEADERBOARD_STOCKS = "leaderboard_stocks"
 MAX_BODY = 2 * 1024 * 1024
 _lock = threading.Lock()
-_mem = {"crypto": None, "stocks": None, "leaderboard": None}
+_mem = {"crypto": None, "stocks": None, "leaderboard": None, "leaderboard_stocks": None}
 
 
 def store_dir():
@@ -20,6 +21,7 @@ def reset_memory():
         _mem["crypto"] = None
         _mem["stocks"] = None
         _mem["leaderboard"] = None
+        _mem["leaderboard_stocks"] = None
 
 
 def _path(book):
@@ -72,8 +74,11 @@ def ingest(book, raw):
     return {"ok": True, "book": book, "received_at": payload["received_at"]}, 200
 
 
-def ingest_leaderboard(raw):
-    """Overwrite the latest D01–D10 demo leaderboard. Paper only."""
+def ingest_leaderboard(raw, key=None):
+    """Overwrite one demo leaderboard. Paper only. Crypto stays on `leaderboard`."""
+    key = key or LEADERBOARD
+    if key not in (LEADERBOARD, LEADERBOARD_STOCKS):
+        return {"error": "書名唔啱"}, 400
     data, err = _parse_object(raw)
     if err:
         return err
@@ -82,13 +87,13 @@ def ingest_leaderboard(raw):
         return {"error": "books 要係陣列"}, 400
     payload = {
         "received_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "book": LEADERBOARD,
+        "book": key,
         "data": data,
     }
-    failed = _commit(LEADERBOARD, payload)
+    failed = _commit(key, payload)
     if failed:
         return failed
-    return {"ok": True, "book": LEADERBOARD, "received_at": payload["received_at"], "books": len(books)}, 200
+    return {"ok": True, "book": key, "received_at": payload["received_at"], "books": len(books)}, 200
 
 
 def _read_disk(book):
@@ -124,11 +129,10 @@ def load_leaderboard():
 
 def load_all():
     with _lock:
-        for book in BOOKS:
+        for book in BOOKS + (LEADERBOARD, LEADERBOARD_STOCKS):
             if _mem.get(book) is None:
                 _mem[book] = _read_disk(book)
-        if _mem.get(LEADERBOARD) is None:
-            _mem[LEADERBOARD] = _read_disk(LEADERBOARD)
         out = {book: _public(_mem.get(book)) for book in BOOKS}
         out[LEADERBOARD] = _public(_mem.get(LEADERBOARD))
+        out[LEADERBOARD_STOCKS] = _public(_mem.get(LEADERBOARD_STOCKS))
         return out

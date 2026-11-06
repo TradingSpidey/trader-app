@@ -3,36 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#05070d">
-<title>{% if demo_only %}Demo 排行榜（78 本 · 角色交叉組合 V6）{% else %}$50 模擬盤成績{% endif %}</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070d'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%233ee0ff' stroke-width='2'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#07080c">
+<title>{% if stocks_demo %}Demo 排行榜（36 本 · 美股交叉組合 V1）{% elif demo_only %}Demo 排行榜（78 本 · 角色交叉組合 V6）{% else %}$50 模擬盤成績{% endif %}</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2307080c'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%232fce85' font-family='sans-serif'%3E即%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/paper.css">
 </head>
-<body data-demo-only="{{ '1' if demo_only else '0' }}">
-<div class="wrap">
-<header class="top">
-  <div>
-    <a class="back" href="/desk">返交易台</a>
-    <a class="back" href="/">研究室</a>
-    {% if demo_only %}
-    <a class="back" href="/paper">返 $50 成績</a>
-    <h1>Demo 排行榜（78 本 · 角色交叉組合 V6）</h1>
-    <p class="sub">CTRL 對照；CX＝E×K×N×S0G0；QX＝同網格×S1G1 品質；AX＝E1/E2×K×N×S2G2 進攻；ZX＝SCAN/RUG 混拼。預設顯示持倉同成交同 combo。</p>
-    {% else %}
-    <a class="back" href="/paper/demo">Demo 排行榜</a>
-    <h1>$50 模擬盤成績</h1>
-    <p class="sub">加密同美股係我部電腦 24 小時跑緊嘅模擬倉，唔係 Render 上面個示範盤。並行 Demo 係 78 本交叉組合（CTRL + CX/QX/AX/ZX）。</p>
-    {% endif %}
+<body data-demo-only="{{ '1' if demo_only else '0' }}" data-market="{{ 'stocks' if stocks_demo else 'crypto' }}">
+<a class="skip" href="#main">跳到內容</a>
+<div class="app">
+{% include "_rail.html" %}
+<header class="topbar">
+  <div class="top-brand">
+    <strong>即日鮮研究室</strong>
+    <span>{% if stocks_demo %}美股 Demo 排行{% elif demo_only %}Demo 排行榜{% else %}$50 模擬盤成績{% endif %}</span>
   </div>
+  <p class="clock" id="clock" aria-live="off">—</p>
 </header>
+<div class="workspace">
 <p class="banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議。</b> <span class="en">Paper trading only. Not real money. Not investment advice.</span> 加密同美股成本假設唔同，唔好直接比較回報。</p>
+<main id="main">
+<header class="page-h">
+  {% if stocks_demo %}
+  <h1>Demo 排行榜（36 本 · 美股交叉組合 V1）</h1>
+  <p class="sub">CTRL 對照；SX＝E×K×N×S0；QX＝S1 品質；AX＝S2 進攻；ZX＝邊角／N2 歸因</p>
+  {% elif demo_only %}
+  <h1>Demo 排行榜（78 本 · 角色交叉組合 V6）</h1>
+  <p class="sub">CTRL 對照；CX＝E×K×N×S0G0；QX＝同網格×S1G1 品質；AX＝E1/E2×K×N×S2G2 進攻；ZX＝SCAN/RUG 混拼。預設顯示持倉同成交同 combo。</p>
+  {% else %}
+  <h1>$50 模擬盤成績</h1>
+  <p class="sub">加密同美股係我部電腦 24 小時跑緊嘅模擬倉，唔係 Render 上面個示範盤。並行 Demo 係 78 本交叉組合（CTRL + CX/QX/AX/ZX）。</p>
+  {% endif %}
+  <p class="demo-links">
+    <a href="/paper/demo">加密 Demo 排行</a>
+    <a href="/paper/demo/stocks">美股 Demo 排行</a>
+  </p>
+</header>
 <section class="card lb-card" aria-labelledby="lb-title">
-  <h2 id="lb-title">Demo 排行榜（78 本 · 角色交叉組合 V6）</h2>
+  <h2 id="lb-title">{% if stocks_demo %}Demo 排行榜（36 本 · 美股交叉組合 V1）{% else %}Demo 排行榜（78 本 · 角色交叉組合 V6）{% endif %}</h2>
   <p class="banner demo-banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議。</b> <span class="en">Paper trading demo. Not real money. Not investment advice.</span></p>
-  <div id="leaderboard"><p class="muted">等緊 Demo 排行榜傳上嚟</p></div>
+  <div id="leaderboard" aria-busy="true"><p class="muted">等緊 Demo 排行榜傳上嚟</p></div>
 </section>
 {% if not demo_only %}
 <section class="card funnel-card" aria-labelledby="funnel-title">
@@ -42,6 +54,8 @@
 </section>
 <div id="books"><p class="muted">等緊數據傳上嚟</p></div>
 {% endif %}
+</main>
+</div>
 </div>
 <script src="/static/paper.js"></script>
 </body>

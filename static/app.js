@@ -552,7 +552,7 @@ $("#ptrbtn").addEventListener("click", async () => {
     if (!r.ok) { out.innerHTML = errCard("讀唔到申報", r.err); btn.disabled = false; return; }
     if (!list.length) { out.innerHTML = `<div class="card"><p class="empty">今年搵唔到呢位議員嘅交易申報。</p></div>`; btn.disabled = false; return; }
     out.innerHTML = `<div class="card"><div class="step">議員交易</div><h2>${esc(list[0].name)} 今年嘅交易申報</h2><div class="tablewrap"><table class="sortable"><thead><tr><th data-k="filed">申報日</th><th data-k="doc">文件</th><th></th></tr></thead><tbody>
-      ${list.map((f) => `<tr data-filed="${attr(f.filed)}" data-doc="${attr(f.doc_id)}"><td class="num">${esc(f.filed)}</td><td><a href="${esc(safeUrl(f.url))}" target="_blank" rel="noopener">${esc(f.doc_id)}</a></td><td><button type="button" class="primary" data-doc="${attr(f.doc_id)}" data-year="${attr(f.year)}">睇內容</button></td></tr>`).join("")}
+      ${list.map((f) => `<tr data-filed="${attr(f.filed)}" data-doc="${attr(f.doc_id)}"><td class="num">${esc(f.filed)}</td><td><a href="${esc(safeUrl(f.url))}" target="_blank" rel="noopener">${esc(f.doc_id)}</a></td><td><button type="button" class="ghost" data-doc="${attr(f.doc_id)}" data-year="${attr(f.year)}">睇內容</button></td></tr>`).join("")}
       </tbody></table></div><p class="explain">撳欄位標題可以排序。法例容許交易後 45 日先申報，所以係舊消息。</p><div id="ptr-detail"></div></div>`;
     bindSort(out);
     out.querySelectorAll("button[data-doc]").forEach((b) => b.addEventListener("click", async () => {
