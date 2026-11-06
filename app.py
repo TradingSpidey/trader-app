@@ -11,6 +11,14 @@ from traderapp import desk, desk_stocks, paper_store, pipeline  # noqa: E402
 app = Flask(__name__)
 
 
+@app.after_request
+def _desk_assets_revalidate(resp):
+    path = request.path or ""
+    if path == "/desk" or path.startswith("/static/desk."):
+        resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return resp
+
+
 def _num(name, default):
     v = (request.args.get(name) or "").replace(",", "").replace("$", "").strip()
     if not v:
