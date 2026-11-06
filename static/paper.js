@@ -124,10 +124,37 @@ function statusLabel(s) {
   if (k === "missing_config") return "缺設定";
   return String(s);
 }
+function firstParam(q, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const v = q[keys[i]];
+    if (v != null && v !== "") return v;
+  }
+  return null;
+}
+function fmtGate(v) {
+  if (v == null || v === "" || !Number.isFinite(Number(v))) return null;
+  const n = Number(v);
+  if (Math.abs(n) <= 1) return pctOfFrac(n);
+  const text = Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1);
+  return text + "%";
+}
+function fmtLiq(v) {
+  if (v == null || v === "" || !Number.isFinite(Number(v))) return null;
+  const n = Number(v);
+  if (Math.abs(n) < 10) return pctOfFrac(n);
+  return "$" + n.toLocaleString("en-US", {maximumFractionDigits: 0});
+}
 function shortParams(p) {
   const q = p && typeof p === "object" ? p : {};
   const maxPos = q.max_positions == null || q.max_positions === "" ? "—" : String(q.max_positions);
-  return `TP ${pctOfFrac(q.tp)} / SL ${pctOfFrac(q.sl)} · 日虧 ${pctOfFrac(q.daily_loss_of_start)} · 最多 ${maxPos} 倉 · 單倉 ${pctOfFrac(q.max_position_pct)}`;
+  const bits = [`TP ${pctOfFrac(q.tp)} / SL ${pctOfFrac(q.sl)} · 日虧 ${pctOfFrac(q.daily_loss_of_start)} · 最多 ${maxPos} 倉 · 單倉 ${pctOfFrac(q.max_position_pct)}`];
+  const mom = fmtGate(firstParam(q, ["mom", "momentum", "mom_h1", "min_mom"]));
+  const liq = fmtLiq(firstParam(q, ["liq", "min_liq", "liq_usd", "min_liq_usd"]));
+  const top10 = fmtGate(firstParam(q, ["top10", "top10_pct", "max_top10"]));
+  if (mom) bits.push(`MOM ${mom}`);
+  if (liq) bits.push(`LIQ ${liq}`);
+  if (top10) bits.push(`TOP10 ${top10}`);
+  return bits.join(" · ");
 }
 
 function demoBookDetail(b) {
@@ -168,7 +195,7 @@ function demoBookDetail(b) {
 
 function leaderboardHtml(item) {
   if (!item || !item.data || typeof item.data !== "object") {
-    return `<p class="muted">等緊 Demo 排行榜傳上嚟。十本 $50 加密模擬倉會喺度按名次排。</p>`;
+    return `<p class="muted">等緊 Demo 排行榜傳上嚟。51 本角色矩陣（CTRL + EXIT/RISK/SCAN/SNIPER/RUG ×10）會喺度按名次排。</p>`;
   }
   const d = item.data;
   const received = parseTime(item.received_at);
