@@ -134,8 +134,7 @@ def _bearer():
     return header[7:].strip()
 
 
-@app.post("/api/paper/ingest/<book>")
-def api_paper_ingest(book):
+def _ingest_denied():
     token = os.environ.get("PAPER_INGEST_TOKEN") or ""
     if not token:
         return jsonify({"error": "未設定接收權杖"}), 503
@@ -144,6 +143,24 @@ def api_paper_ingest(book):
         return jsonify({"error": "未授權"}), 401
     if request.content_length is not None and request.content_length > paper_store.MAX_BODY:
         return jsonify({"error": "內容太大"}), 400
+    return None
+
+
+@app.post("/api/paper/ingest/leaderboard")
+def api_paper_ingest_leaderboard():
+    denied = _ingest_denied()
+    if denied:
+        return denied
+    raw = request.get_data(cache=False) or b""
+    body, code = paper_store.ingest_leaderboard(raw)
+    return jsonify(body), code
+
+
+@app.post("/api/paper/ingest/<book>")
+def api_paper_ingest(book):
+    denied = _ingest_denied()
+    if denied:
+        return denied
     raw = request.get_data(cache=False) or b""
     body, code = paper_store.ingest(book, raw)
     return jsonify(body), code
@@ -156,7 +173,12 @@ def api_paper():
 
 @app.get("/paper")
 def paper_page():
-    return render_template("paper.html")
+    return render_template("paper.html", demo_only=False)
+
+
+@app.get("/paper/demo")
+def paper_demo_page():
+    return render_template("paper.html", demo_only=True)
 
 
 @app.get("/healthz")
