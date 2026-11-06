@@ -1,0 +1,495 @@
+{
+  "version": 1,
+  "matrix_id": "METHODS_V1",
+  "title": "五方法紙盤｜METHODS_V1",
+  "disclaimer": "模擬盤，唔係真錢，唔係投資建議｜唔保證盈利",
+  "start_usd": 100.0,
+  "market": "stocks",
+  "generated_hkt": "2026-11-07 04:18:00 HKT",
+  "book_count": 5,
+  "success_criteria": {
+    "net_profit_7d_gt": 0,
+    "max_dd_pct_le": 15,
+    "min_closed": 15
+  },
+  "books": [
+    {
+      "id": "M1",
+      "code": "MomBreak",
+      "label": "M1 MomBreak｜動量突破",
+      "name_zh": "動量突破",
+      "name_en": "Momentum Breakout",
+      "method": "momentum_breakout",
+      "note": "收市創 20 日高＋量＞均量×1.2 入場；TP6%／SL3%",
+      "warning": null,
+      "start_usd": 100.0,
+      "equity_usd": 99.97,
+      "ret_pct": -0.03,
+      "wins": 0,
+      "closed": 0,
+      "open_positions": 1,
+      "kill": false,
+      "positions": [
+        {
+          "symbol": "KO",
+          "qty": 0.260305643598155,
+          "entry_usd": 96.04094499999998,
+          "cost_usd": 25.01,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "MomBreak 創20日高 $95.94＞$95.83（無量資料）",
+          "last_usd": 95.945,
+          "value_usd": 24.97502497502498,
+          "upnl_usd": -0.03497502497502225,
+          "ret": -0.0009990009990008542
+        }
+      ],
+      "trades": [
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "KO",
+          "side": "BUY",
+          "price_usd": "96.040945",
+          "qty": "0.26030564",
+          "notional": "25.0000",
+          "reason": "MomBreak 創20日高 $95.94＞$95.83（無量資料）",
+          "pnl_usd": "",
+          "quote_usd": "95.945000",
+          "fee_usd": "0.0100",
+          "fill_id": "1"
+        }
+      ],
+      "params": {
+        "tp": 0.06,
+        "sl": 0.03,
+        "max_positions": 3,
+        "max_position_pct": 0.25,
+        "lookback": 20
+      },
+      "win_rate_pct": null,
+      "cash_usd": 74.99,
+      "state_saved_hkt": "2026-11-07 04:17:00 HKT",
+      "backtest": {
+        "net_pct": 32.46,
+        "max_dd_pct": 8.05,
+        "closed": 87,
+        "sample_note": "OK",
+        "warning_flags": []
+      }
+    },
+    {
+      "id": "M4",
+      "code": "MeanRev",
+      "label": "M4 MeanRev｜均值回歸（嚴）",
+      "name_zh": "均值回歸",
+      "name_en": "Mean Reversion",
+      "method": "mean_reversion",
+      "note": "RSI14＜30 且近下軌買；回歸中軌或 SL／TP 出",
+      "warning": "逆勢；樣本／趨勢市風險高；加密極嚴唔開",
+      "start_usd": 100.0,
+      "equity_usd": 99.97,
+      "ret_pct": -0.03,
+      "wins": 0,
+      "closed": 0,
+      "open_positions": 1,
+      "kill": false,
+      "positions": [
+        {
+          "symbol": "CRM",
+          "qty": 0.09350877512060646,
+          "entry_usd": 213.88366999999997,
+          "cost_usd": 20.01,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "MeanRev RSI25.2＜30 近下軌$216.45",
+          "last_usd": 213.67,
+          "value_usd": 19.980019980019982,
+          "upnl_usd": -0.029980019980019534,
+          "ret": -0.0009990009990008542
+        }
+      ],
+      "trades": [
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "CRM",
+          "side": "BUY",
+          "price_usd": "213.883670",
+          "qty": "0.09350878",
+          "notional": "20.0000",
+          "reason": "MeanRev RSI25.2＜30 近下軌$216.45",
+          "pnl_usd": "",
+          "quote_usd": "213.670000",
+          "fee_usd": "0.0100",
+          "fill_id": "1"
+        }
+      ],
+      "params": {
+        "tp": 0.03,
+        "sl": 0.02,
+        "max_positions": 2,
+        "max_position_pct": 0.2,
+        "rsi_buy": 30
+      },
+      "win_rate_pct": null,
+      "cash_usd": 79.99,
+      "state_saved_hkt": "2026-11-07 04:17:00 HKT",
+      "backtest": {
+        "net_pct": -2.83,
+        "max_dd_pct": 7.11,
+        "closed": 75,
+        "sample_note": "OK",
+        "warning_flags": [
+          "策略警示",
+          "回測淨利≤0"
+        ]
+      }
+    },
+    {
+      "id": "M3",
+      "code": "VolBreak",
+      "label": "M3 VolBreak｜波動突破",
+      "name_zh": "波動突破",
+      "name_en": "Volatility Breakout",
+      "method": "vol_breakout",
+      "note": "收市＞昨收＋1.5×ATR14 入場；TP5%／SL2.5%",
+      "warning": null,
+      "start_usd": 100.0,
+      "equity_usd": 99.9,
+      "ret_pct": -0.1,
+      "wins": 0,
+      "closed": 0,
+      "open_positions": 3,
+      "kill": false,
+      "positions": [
+        {
+          "symbol": "AMD",
+          "qty": 0.05561251636648551,
+          "entry_usd": 449.53908999999993,
+          "cost_usd": 25.01,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "VolBreak 收$449.09＞昨收+1.5×ATR($443.38)",
+          "last_usd": 449.09,
+          "value_usd": 24.975024975024976,
+          "upnl_usd": -0.034975024975025804,
+          "ret": -0.0009990009990008542
+        },
+        {
+          "symbol": "QCOM",
+          "qty": 0.14986218046041264,
+          "entry_usd": 166.76159499999997,
+          "cost_usd": 25.00125624375624,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "VolBreak 收$166.59＞昨收+1.5×ATR($164.98)",
+          "last_usd": 166.595,
+          "value_usd": 24.96628995380244,
+          "upnl_usd": -0.034966289953800356,
+          "ret": -0.0009990009990008542
+        },
+        {
+          "symbol": "TSLA",
+          "qty": 0.06910196614933034,
+          "entry_usd": 361.53117,
+          "cost_usd": 24.99251467126779,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "VolBreak 收$361.17＞昨收+1.5×ATR($360.09)",
+          "last_usd": 361.17,
+          "value_usd": 24.95755711415364,
+          "upnl_usd": -0.03495755711415072,
+          "ret": -0.0009990009990008542
+        }
+      ],
+      "trades": [
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "AMD",
+          "side": "BUY",
+          "price_usd": "449.539090",
+          "qty": "0.05561252",
+          "notional": "25.0000",
+          "reason": "VolBreak 收$449.09＞昨收+1.5×ATR($443.38)",
+          "pnl_usd": "",
+          "quote_usd": "449.090000",
+          "fee_usd": "0.0100",
+          "fill_id": "1"
+        },
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "QCOM",
+          "side": "BUY",
+          "price_usd": "166.761595",
+          "qty": "0.14986218",
+          "notional": "24.9913",
+          "reason": "VolBreak 收$166.59＞昨收+1.5×ATR($164.98)",
+          "pnl_usd": "",
+          "quote_usd": "166.595000",
+          "fee_usd": "0.0100",
+          "fill_id": "2"
+        },
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "TSLA",
+          "side": "BUY",
+          "price_usd": "361.531170",
+          "qty": "0.06910197",
+          "notional": "24.9825",
+          "reason": "VolBreak 收$361.17＞昨收+1.5×ATR($360.09)",
+          "pnl_usd": "",
+          "quote_usd": "361.170000",
+          "fee_usd": "0.0100",
+          "fill_id": "3"
+        }
+      ],
+      "params": {
+        "tp": 0.05,
+        "sl": 0.025,
+        "max_positions": 3,
+        "max_position_pct": 0.25,
+        "atr_k": 1.5
+      },
+      "win_rate_pct": null,
+      "cash_usd": 24.99622908497596,
+      "state_saved_hkt": "2026-11-07 04:17:00 HKT",
+      "backtest": {
+        "net_pct": -2.55,
+        "max_dd_pct": 20.21,
+        "closed": 106,
+        "sample_note": "OK",
+        "warning_flags": [
+          "回測DD>15%",
+          "回測淨利≤0"
+        ]
+      }
+    },
+    {
+      "id": "M2",
+      "code": "TrendMA",
+      "label": "M2 TrendMA｜均線趨勢",
+      "name_zh": "均線趨勢",
+      "name_en": "Trend Following MA",
+      "method": "trend_ma",
+      "note": "價＞SMA50 且 SMA20＞SMA50 入場；跌破 SMA20 或 SL／TP 出",
+      "warning": null,
+      "start_usd": 100.0,
+      "equity_usd": 99.88,
+      "ret_pct": -0.12,
+      "wins": 0,
+      "closed": 0,
+      "open_positions": 3,
+      "kill": false,
+      "positions": [
+        {
+          "symbol": "AMZN",
+          "qty": 0.11468269991975653,
+          "entry_usd": 261.59132999999997,
+          "cost_usd": 30.01,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "TrendMA 價$261.33＞SMA50＋SMA20＞SMA50",
+          "last_usd": 261.33,
+          "value_usd": 29.970029970029973,
+          "upnl_usd": -0.03997002997002852,
+          "ret": -0.0009990009990009652
+        },
+        {
+          "symbol": "KO",
+          "qty": 0.3122419192252741,
+          "entry_usd": 96.04094499999998,
+          "cost_usd": 29.998008991008987,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "TrendMA 價$95.94＞SMA50＋SMA20＞SMA50",
+          "last_usd": 95.945,
+          "value_usd": 29.958050940068922,
+          "upnl_usd": -0.03995805094006499,
+          "ret": -0.0009990009990008542
+        },
+        {
+          "symbol": "V",
+          "qty": 0.07088751316793133,
+          "entry_usd": 422.8674449999999,
+          "cost_usd": 29.986021575726976,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "TrendMA 價$422.44＞SMA50＋SMA20＞SMA50",
+          "last_usd": 422.445,
+          "value_usd": 29.94607550022675,
+          "upnl_usd": -0.03994607550022522,
+          "ret": -0.0009990009990008542
+        }
+      ],
+      "trades": [
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "AMZN",
+          "side": "BUY",
+          "price_usd": "261.591330",
+          "qty": "0.11468270",
+          "notional": "30.0000",
+          "reason": "TrendMA 價$261.33＞SMA50＋SMA20＞SMA50",
+          "pnl_usd": "",
+          "quote_usd": "261.330000",
+          "fee_usd": "0.0100",
+          "fill_id": "1"
+        },
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "KO",
+          "side": "BUY",
+          "price_usd": "96.040945",
+          "qty": "0.31224192",
+          "notional": "29.9880",
+          "reason": "TrendMA 價$95.94＞SMA50＋SMA20＞SMA50",
+          "pnl_usd": "",
+          "quote_usd": "95.945000",
+          "fee_usd": "0.0100",
+          "fill_id": "2"
+        },
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "V",
+          "side": "BUY",
+          "price_usd": "422.867445",
+          "qty": "0.07088751",
+          "notional": "29.9760",
+          "reason": "TrendMA 價$422.44＞SMA50＋SMA20＞SMA50",
+          "pnl_usd": "",
+          "quote_usd": "422.445000",
+          "fee_usd": "0.0100",
+          "fill_id": "3"
+        }
+      ],
+      "params": {
+        "tp": 0.08,
+        "sl": 0.04,
+        "max_positions": 3,
+        "max_position_pct": 0.3,
+        "sma_fast": 20,
+        "sma_slow": 50
+      },
+      "win_rate_pct": null,
+      "cash_usd": 10.005969433264031,
+      "state_saved_hkt": "2026-11-07 04:17:00 HKT",
+      "backtest": {
+        "net_pct": 21.43,
+        "max_dd_pct": 15.19,
+        "closed": 76,
+        "sample_note": "OK",
+        "warning_flags": [
+          "回測DD>15%"
+        ]
+      }
+    },
+    {
+      "id": "M5",
+      "code": "XSecMom",
+      "label": "M5 XSecMom｜相對強弱",
+      "name_zh": "橫截面動量",
+      "name_en": "Cross-Sectional Momentum",
+      "method": "xsec_mom",
+      "note": "每 5 交易日按 60 日回報取前 3；等權；轉勢月回撤風險",
+      "warning": null,
+      "start_usd": 100.0,
+      "equity_usd": 99.87,
+      "ret_pct": -0.13,
+      "wins": 0,
+      "closed": 0,
+      "open_positions": 3,
+      "kill": false,
+      "positions": [
+        {
+          "symbol": "V",
+          "qty": 0.0780386392714625,
+          "entry_usd": 422.8674449999999,
+          "cost_usd": 33.01,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "XSecMom 60日相對強 前3",
+          "last_usd": 422.445,
+          "value_usd": 32.96703296703298,
+          "upnl_usd": -0.0429670329670202,
+          "ret": -0.0009990009990008542
+        },
+        {
+          "symbol": "MA",
+          "qty": 0.05033354413708744,
+          "entry_usd": 655.34469,
+          "cost_usd": 32.995820879120885,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "XSecMom 60日相對強 前3",
+          "last_usd": 654.69,
+          "value_usd": 32.95286801110978,
+          "upnl_usd": -0.042952868011106204,
+          "ret": -0.0009990009990009652
+        },
+        {
+          "symbol": "AAPL",
+          "qty": 0.0957994000667547,
+          "entry_usd": 344.17382999999995,
+          "cost_usd": 32.981646432677216,
+          "opened_at": "2026-11-07 04:17:00 HKT",
+          "why": "XSecMom 60日相對強 前3",
+          "last_usd": 343.83,
+          "value_usd": 32.938707724952266,
+          "upnl_usd": -0.04293870772495012,
+          "ret": -0.0009990009990008542
+        }
+      ],
+      "trades": [
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "V",
+          "side": "BUY",
+          "price_usd": "422.867445",
+          "qty": "0.07803864",
+          "notional": "33.0000",
+          "reason": "XSecMom 60日相對強 前3",
+          "pnl_usd": "",
+          "quote_usd": "422.445000",
+          "fee_usd": "0.0100",
+          "fill_id": "1"
+        },
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "MA",
+          "side": "BUY",
+          "price_usd": "655.344690",
+          "qty": "0.05033354",
+          "notional": "32.9858",
+          "reason": "XSecMom 60日相對強 前3",
+          "pnl_usd": "",
+          "quote_usd": "654.690000",
+          "fee_usd": "0.0100",
+          "fill_id": "2"
+        },
+        {
+          "time_hkt": "2026-11-07 04:17:00 HKT",
+          "symbol": "AAPL",
+          "side": "BUY",
+          "price_usd": "344.173830",
+          "qty": "0.09579940",
+          "notional": "32.9716",
+          "reason": "XSecMom 60日相對強 前3",
+          "pnl_usd": "",
+          "quote_usd": "343.830000",
+          "fee_usd": "0.0100",
+          "fill_id": "3"
+        }
+      ],
+      "params": {
+        "tp": 0.12,
+        "sl": 0.06,
+        "max_positions": 3,
+        "max_position_pct": 0.33,
+        "mom_lookback": 60,
+        "top_k": 3
+      },
+      "win_rate_pct": null,
+      "cash_usd": 1.0125326882019081,
+      "state_saved_hkt": "2026-11-07 04:17:00 HKT",
+      "backtest": {
+        "net_pct": -23.38,
+        "max_dd_pct": 47.81,
+        "closed": 63,
+        "sample_note": "OK",
+        "warning_flags": [
+          "回測DD>15%",
+          "回測淨利≤0"
+        ]
+      }
+    }
+  ]
+}

@@ -358,6 +358,112 @@ class PaperIngestTests(unittest.TestCase):
         self.assertEqual(crypto_page.count("Demo 排行榜（78 本 · 角色交叉組合 V6）"), 3)
         self.assertNotIn(title, crypto_page)
 
+    def test_methods_leaderboard_is_separate(self):
+        missing = self.client.post("/api/paper/ingest/leaderboard_methods", data=b"{}", content_type="application/json")
+        self.assertEqual(missing.status_code, 503)
+        os.environ["PAPER_INGEST_TOKEN"] = "correct-token"
+        headers = {"Authorization": "Bearer correct-token", "Content-Type": "application/json"}
+        bad = self.client.post(
+            "/api/paper/ingest/leaderboard_methods", data=b"{}", headers={"Authorization": "Bearer nope"})
+        self.assertEqual(bad.status_code, 401)
+        self.assertNotIn(b"correct-token", bad.data)
+        not_list = self.client.post(
+            "/api/paper/ingest/leaderboard_methods", data=json.dumps({"books": "nope"}), headers=headers)
+        self.assertEqual(not_list.status_code, 400)
+        crypto = self.client.post(
+            "/api/paper/ingest/leaderboard",
+            data=json.dumps({"book_count": 1, "books": [{"id": "C0", "label": "crypto"}]}),
+            headers=headers)
+        self.assertEqual(crypto.status_code, 200)
+        stocks = self.client.post(
+            "/api/paper/ingest/leaderboard_stocks",
+            data=json.dumps({"market": "stocks", "book_count": 1, "books": [{"id": "S0", "label": "stock"}]}),
+            headers=headers)
+        self.assertEqual(stocks.status_code, 200)
+        sample = _sample("methods_leaderboard")
+        res = self.client.post(
+            "/api/paper/ingest/leaderboard_methods", data=json.dumps(sample), headers=headers)
+        self.assertEqual(res.status_code, 200)
+        body = res.get_json()
+        self.assertEqual(body["book"], "leaderboard_methods")
+        self.assertEqual(body["books"], 5)
+        paper_store.reset_memory()
+        api = self.client.get("/api/paper").get_json()
+        self.assertEqual(api["leaderboard"]["data"]["books"][0]["id"], "C0")
+        self.assertEqual(api["leaderboard_stocks"]["data"]["books"][0]["id"], "S0")
+        board = api["leaderboard_methods"]["data"]
+        self.assertEqual(board["matrix_id"], "METHODS_V1")
+        self.assertEqual(board["start_usd"], 100.0)
+        self.assertEqual(board["book_count"], 5)
+        books = {b["id"]: b for b in board["books"]}
+        self.assertEqual(list(books), ["M1", "M4", "M3", "M2", "M5"])
+        self.assertEqual(books["M1"]["name_zh"], "動量突破")
+        self.assertEqual(books["M1"]["name_en"], "Momentum Breakout")
+        self.assertEqual(books["M1"]["equity_usd"], 99.97)
+        self.assertEqual(books["M1"]["positions"][0]["symbol"], "KO")
+        self.assertEqual(books["M1"]["backtest"]["warning_flags"], [])
+        self.assertEqual(books["M2"]["name_zh"], "均線趨勢")
+        self.assertEqual(books["M2"]["backtest"]["warning_flags"], ["回測DD>15%"])
+        self.assertEqual(books["M3"]["label"], "M3 VolBreak｜波動突破")
+        self.assertEqual(books["M3"]["backtest"]["warning_flags"], ["回測DD>15%", "回測淨利≤0"])
+        self.assertIn("逆勢", books["M4"]["warning"])
+        self.assertIn("策略警示", books["M4"]["backtest"]["warning_flags"])
+        self.assertEqual(books["M5"]["name_en"], "Cross-Sectional Momentum")
+        self.assertEqual(books["M5"]["label"], "M5 XSecMom｜相對強弱")
+        self.assertIn("回測DD>15%", books["M5"]["backtest"]["warning_flags"])
+        self.assertIsNone(books["M1"]["win_rate_pct"])
+        page = self.client.get("/paper")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b'href="/paper/methods"', page.data)
+        self.assertIn(b'id="books"', page.data)
+        self.assertIn(b'id="funnel"', page.data)
+        self.assertIn(b'id="leaderboard"', page.data)
+        methods = self.client.get("/paper/methods")
+        self.assertEqual(methods.status_code, 200)
+        text = methods.data.decode()
+        self.assertEqual(text.count("五方法紙盤｜METHODS_V1"), 3)
+        self.assertIn("五方法紙盤｜METHODS_V1｜各 $100", text)
+        for label in (
+            "M1 MomBreak｜動量突破",
+            "M2 TrendMA｜均線趨勢",
+            "M3 VolBreak｜波動突破",
+            "M4 MeanRev｜均值回歸",
+            "M5 XSecMom｜相對強弱",
+        ):
+            self.assertIn(label, text)
+        self.assertIn("模擬盤，唔係真錢，唔係投資建議", text)
+        self.assertIn("Paper trading only. Not real money. Not investment advice.", text)
+        self.assertIn("7 日紙盤淨利 > 0 優先晉級", text)
+        self.assertIn("maxDD ≤ 15%", text)
+        self.assertIn("平倉 ≥ 15 先認真比較", text)
+        self.assertIn("唔保證盈利｜模擬盤", text)
+        self.assertNotIn("。", text)
+        self.assertIn('id="methods"', text)
+        self.assertIn('data-methods="1"', text)
+        self.assertNotIn('id="books"', text)
+        self.assertNotIn('id="funnel"', text)
+        self.assertNotIn('id="leaderboard"', text)
+        js_path = os.path.join(os.path.dirname(__file__), "..", "static", "paper.js")
+        with open(js_path, encoding="utf-8") as fh:
+            js = fh.read()
+        self.assertIn("leaderboard_methods", js)
+        self.assertIn("methodsHtml", js)
+        self.assertIn("WARNING", js)
+        for label in ("M1 MomBreak｜動量突破", "M3 VolBreak｜波動突破", "M5 XSecMom｜相對強弱"):
+            self.assertIn(label, js)
+        demo = self.client.get("/paper/demo")
+        stocks_page = self.client.get("/paper/demo/stocks")
+        desk = self.client.get("/desk")
+        self.assertEqual(demo.status_code, 200)
+        self.assertEqual(stocks_page.status_code, 200)
+        self.assertEqual(desk.status_code, 200)
+        self.assertIn("Demo 排行榜（78 本 · 角色交叉組合 V6）", demo.data.decode())
+        self.assertIn("Demo 排行榜（36 本 · 美股交叉組合 V1）", stocks_page.data.decode())
+        self.assertNotIn("METHODS_V1", demo.data.decode())
+        self.assertNotIn("METHODS_V1", stocks_page.data.decode())
+        self.assertIn(b'id="books"', self.client.get("/paper").data)
+        self.assertNotIn(b'id="methods"', demo.data)
+
 
 if __name__ == "__main__":
     unittest.main()

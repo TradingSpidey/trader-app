@@ -401,6 +401,126 @@ function funnelHtml(item) {
     ${log}`;
 }
 
+const METHOD_SPECS = [
+  {id: "M1", code: "MomBreak", name_zh: "動量突破", name_en: "Momentum Breakout", label: "M1 MomBreak｜動量突破"},
+  {id: "M2", code: "TrendMA", name_zh: "均線趨勢", name_en: "Trend Following MA", label: "M2 TrendMA｜均線趨勢"},
+  {id: "M3", code: "VolBreak", name_zh: "波動突破", name_en: "Volatility Breakout", label: "M3 VolBreak｜波動突破"},
+  {id: "M4", code: "MeanRev", name_zh: "均值回歸", name_en: "Mean Reversion", label: "M4 MeanRev｜均值回歸"},
+  {id: "M5", code: "XSecMom", name_zh: "相對強弱", name_en: "Cross-Sectional Momentum", label: "M5 XSecMom｜相對強弱"},
+];
+
+function methodRows(d) {
+  const live = d && Array.isArray(d.books) ? d.books.filter((b) => b && typeof b === "object") : [];
+  if (!live.length) return METHOD_SPECS.map((s) => Object.assign({waiting: true, start_usd: 100}, s));
+  const byId = {};
+  live.forEach((b) => {
+    if (b.id != null && b.id !== "") byId[String(b.id)] = b;
+  });
+  const seen = {};
+  const rows = [];
+  METHOD_SPECS.forEach((s) => {
+    const hit = byId[s.id];
+    if (hit) {
+      seen[s.id] = true;
+      rows.push(Object.assign({}, s, hit));
+    } else {
+      rows.push(Object.assign({waiting: true, start_usd: 100}, s));
+    }
+  });
+  live.forEach((b) => {
+    const id = b.id == null ? "" : String(b.id);
+    if (id && seen[id]) return;
+    rows.push(b);
+  });
+  return rows;
+}
+
+function methodWinRate(b) {
+  if (!b || b.waiting) return "—";
+  const given = b.win_rate_pct;
+  if (given != null && given !== "" && Number.isFinite(Number(given))) {
+    return Number(given).toFixed(1) + "%";
+  }
+  const closed = Number(b.closed);
+  const wins = Number(b.wins);
+  if (Number.isFinite(closed) && closed > 0 && Number.isFinite(wins)) {
+    return ((wins / closed) * 100).toFixed(1) + "% · " + wins + " 贏 / " + closed + " 平倉";
+  }
+  const w = b.wins == null || b.wins === "" ? "0" : String(b.wins);
+  const c = b.closed == null || b.closed === "" ? "0" : String(b.closed);
+  return "未有平倉 · " + w + " 贏 / " + c + " 平倉";
+}
+
+function methodWarnings(b) {
+  const out = [];
+  if (b && b.warning) out.push(String(b.warning));
+  const flags = b && b.backtest && Array.isArray(b.backtest.warning_flags) ? b.backtest.warning_flags : [];
+  flags.forEach((f) => { if (f) out.push(String(f)); });
+  return out;
+}
+
+function methodPositions(b) {
+  const positions = Array.isArray(b.positions) ? b.positions : [];
+  if (!positions.length) return `<p class="muted">${b.waiting ? "等緊數據" : "未有持倉"}</p>`;
+  const rows = positions.map((p) => {
+    const qty = num(p.qty, 4);
+    return `<tr>
+    <td><b>${esc(p.symbol)}</b></td>
+    <td class="num">${esc(dash(qty == null ? p.qty : qty))}</td>
+    <td class="num">${usd(p.entry_usd)}</td>
+    <td class="num">${usd(p.last_usd)}</td>
+    <td class="num ${cls(Number(p.upnl_usd))}">${usd(p.upnl_usd, 2)}</td>
+    <td>${esc(p.why || "—")}</td>
+  </tr>`;
+  }).join("");
+  return `<div class="scroll"><table><thead><tr><th>代號</th><th>數量</th><th>入場</th><th>而家</th><th>浮動</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function methodCard(b) {
+  const label = b.label || `${b.id || ""} ${b.code || ""}｜${b.name_zh || ""}`.replace(/｜$/, "");
+  const zh = b.name_zh ? String(b.name_zh) : "";
+  const en = b.name_en ? String(b.name_en) : "";
+  const ret = b.ret_pct == null || b.ret_pct === "" ? null : Number(b.ret_pct);
+  const start = b.start_usd == null || b.start_usd === "" ? 100 : b.start_usd;
+  const openN = b.waiting ? "—" : String(b.open_positions == null ? (Array.isArray(b.positions) ? b.positions.length : 0) : b.open_positions);
+  const flags = b.waiting ? [] : methodWarnings(b);
+  const bt = !b.waiting && b.backtest && typeof b.backtest === "object" ? b.backtest : null;
+  const dd = bt && bt.max_dd_pct != null && bt.max_dd_pct !== "" && Number.isFinite(Number(bt.max_dd_pct))
+    ? Number(bt.max_dd_pct).toFixed(2) + "%" : "—";
+  const btLine = bt ? `<p class="note">回測淨利 ${esc(pctPoints(bt.net_pct))} · 最大回撤 ${esc(dd)} · 回測平倉 ${esc(dash(bt.closed))}</p>` : "";
+  const warn = flags.length
+    ? `<p class="method-warn" role="note"><b>WARNING</b> ${esc(flags.join(" · "))}</p>`
+    : `<p class="note">${b.waiting ? "回測警示：等緊數據" : "回測警示：無"}</p>`;
+  const eq = usd(b.equity_usd, 2);
+  return `<article class="card method-card" id="method-${esc(b.id || "")}">
+    <h3><span class="num">${esc(b.id || "—")}</span> ${esc(b.code || "")}</h3>
+    <p class="method-name">${esc(zh || label)}${en ? `<span class="en">${esc(en)}</span>` : ""}</p>
+    <p class="note">${esc(label)}</p>
+    <div class="kpis">
+      ${kpi("權益", `<span class="${cls(ret)}">${eq}</span>`)}
+      ${kpi("起始", usd(start, 0))}
+      ${kpi("勝率", esc(methodWinRate(b)))}
+      ${kpi("持倉", esc(openN))}
+    </div>
+    <p class="note">${esc(b.note || (b.waiting ? "等緊數據傳上嚟" : "暫無簡介"))}</p>
+    ${warn}
+    ${btLine}
+    <section class="book-sec" aria-label="持倉"><h4>持倉</h4>${methodPositions(b)}</section>
+  </article>`;
+}
+
+function methodsHtml(item) {
+  const d = item && item.data && typeof item.data === "object" ? item.data : null;
+  const rows = methodRows(d);
+  const received = item ? parseTime(item.received_at) : null;
+  const stale = received != null && Date.now() - received > 10 * 60 * 1000;
+  const updated = d && (d.generated_hkt || d.updated_hkt) ? String(d.generated_hkt || d.updated_hkt) : "";
+  const start = d && d.start_usd != null && d.start_usd !== "" ? d.start_usd : 100;
+  const freshness = !d ? " · 等緊五方法紙盤傳上嚟" : (stale ? ` · <span class="stale">數據可能過時（我部電腦暫停中）</span>` : (received ? " · " + esc(ago(received)) : ""));
+  return `<p class="note">今次 ${rows.length} 本 · 起始 ${esc(usd(start, 0))}${updated ? " · " + esc(updated) : ""}${freshness}</p>
+    <div class="method-grid">${rows.map(methodCard).join("")}</div>`;
+}
+
 async function load() {
   const r = await fetch("/api/paper");
   if (!r.ok) throw new Error("讀唔到成績");
@@ -410,6 +530,11 @@ async function load() {
   if (lb) {
     lb.innerHTML = leaderboardHtml(pageMarket === "stocks" ? j.leaderboard_stocks : j.leaderboard, pageMarket);
     lb.removeAttribute("aria-busy");
+  }
+  const methods = $("#methods");
+  if (methods) {
+    methods.innerHTML = methodsHtml(j && j.leaderboard_methods);
+    methods.removeAttribute("aria-busy");
   }
   const funnel = $("#funnel");
   if (funnel) funnel.innerHTML = funnelHtml(j && j.crypto);
@@ -426,6 +551,8 @@ setInterval(tickClock, 1000);
 load().catch((e) => {
   const lb = $("#leaderboard");
   if (lb) lb.textContent = e.message;
+  const methods = $("#methods");
+  if (methods) methods.textContent = e.message;
   const funnel = $("#funnel");
   if (funnel) funnel.textContent = e.message;
   const books = $("#books");
