@@ -116,6 +116,32 @@ class PaperIngestTests(unittest.TestCase):
             "ret_pct": None,
             "params": None,
         })
+        sample["books"][0]["positions"] = [{
+            "symbol": "TEST",
+            "mint": "So11111111111111111111111111111111111111112",
+            "side": "long",
+            "entry_usd": 1.25,
+            "last_usd": 1.3,
+            "qty": 10,
+            "value_sol": 0.14,
+            "upnl_sol": 0.01,
+            "ret": 0.04,
+            "opened_at": "2026-11-06T12:00:00Z",
+            "why": "fixture",
+        }]
+        sample["books"][0]["trades"] = [{
+            "time_hkt": "2026-11-06 20:00:00 HKT",
+            "symbol": "TEST",
+            "mint": "So11111111111111111111111111111111111111112",
+            "side": "buy",
+            "price_usd": 1.25,
+            "qty": 10,
+            "sol": 0.14,
+            "reason": "fixture fill",
+            "pnl_sol": None,
+            "pnl_usd": None,
+            "fill_id": "fix-1",
+        }]
         again = self.client.post("/api/paper/ingest/leaderboard", data=json.dumps(sample), headers=headers)
         self.assertEqual(again.status_code, 200)
         self.assertEqual(again.get_json()["books"], 11)
@@ -126,6 +152,10 @@ class PaperIngestTests(unittest.TestCase):
         self.assertEqual(board["updated_hkt"], sample["updated_hkt"])
         self.assertNotEqual(board["updated_hkt"], first["updated_hkt"])
         self.assertEqual(board["books"][0]["id"], "D02")
+        self.assertEqual(board["books"][0]["positions"][0]["symbol"], "TEST")
+        self.assertEqual(board["books"][0]["positions"][0]["upnl_sol"], 0.01)
+        self.assertEqual(board["books"][0]["trades"][0]["fill_id"], "fix-1")
+        self.assertIsNone(board["books"][0]["trades"][0]["pnl_sol"])
         self.assertEqual(board["books"][-1]["rank"], None)
         self.assertEqual(board["books"][-1]["status"], "not_started")
         page = self.client.get("/paper")
@@ -134,7 +164,12 @@ class PaperIngestTests(unittest.TestCase):
         self.assertIn(b'id="books"', page.data)
         demo = self.client.get("/paper/demo")
         self.assertEqual(demo.status_code, 200)
-        self.assertIn("Demo 排行榜 D01–D10".encode(), demo.data)
+        self.assertIn("Demo 排行榜 R0–R9".encode(), demo.data)
+        self.assertIn("預設顯示每本持倉同成交".encode(), demo.data)
+        page_home = page.data.decode()
+        self.assertIn("R0–R9 係並行 demo", page_home)
+        self.assertNotIn("D01–D10", page_home)
+        self.assertNotIn("D01–D10", demo.data.decode())
         self.assertIn("模擬盤，唔係真錢，唔係投資建議".encode(), demo.data)
         self.assertIn(b"Paper trading only. Not real money. Not investment advice.", demo.data)
         self.assertNotIn(b'id="books"', demo.data)

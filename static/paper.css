@@ -66,3 +66,8 @@ th { color: var(--muted); font-weight: 600; }
 .tag.pass { color: var(--cyan); border-color: rgba(62,224,255,.45); }
 .tag.exit { color: var(--red); border-color: rgba(255,93,122,.45); }
 @media (max-width: 900px) { .funnel-stages { grid-template-columns: 1fr 1fr; } }
+
+
+.lb-books { display: grid; gap: 12px; margin-top: 16px; }
+.lb-book h3 { margin: 0 0 6px; font-size: 1.05rem; }
+.lb-book h4 { margin: 10px 0 6px; font-size: 0.95rem; color: #9eb4c9; }
