@@ -195,7 +195,7 @@ function demoBookDetail(b) {
 
 function leaderboardHtml(item) {
   if (!item || !item.data || typeof item.data !== "object") {
-    return `<p class="muted">等緊 Demo 排行榜傳上嚟。51 本角色矩陣（CTRL + EXIT/RISK/SCAN/SNIPER/RUG ×10）會喺度按名次排。</p>`;
+    return `<p class="muted">等緊 Demo 排行榜傳上嚟。43 本角色交叉組合 V5（CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤）會喺度按名次排。</p>`;
   }
   const d = item.data;
   const received = parseTime(item.received_at);

@@ -165,16 +165,31 @@ class PaperIngestTests(unittest.TestCase):
         demo = self.client.get("/paper/demo")
         self.assertEqual(demo.status_code, 200)
         demo_text = demo.data.decode()
-        self.assertIn("Demo 排行榜（51 本 · 角色矩陣 V4）", demo_text)
-        self.assertIn("CTRL 對照 + EXIT/RISK/SCAN/SNIPER/RUG ×10", demo_text)
-        self.assertIn("預設顯示每本持倉同成交", demo_text)
-        self.assertNotIn("R0–R9", demo_text)
-        self.assertNotIn("十本", demo_text)
+        title = "Demo 排行榜（43 本 · 角色交叉組合 V5）"
+        sub = "CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤。預設顯示持倉同成交。"
+        self.assertEqual(demo_text.count(title), 3)
+        self.assertIn(sub, demo_text)
         page_home = page.data.decode()
-        self.assertIn("51 本角色矩陣 V4", page_home)
-        self.assertIn("CTRL + EXIT/RISK/SCAN/SNIPER/RUG ×10", page_home)
-        self.assertNotIn("R0–R9", page_home)
-        self.assertNotIn("十本", page_home)
+        self.assertIn(title, page_home)
+        self.assertIn(
+            "並行 Demo 係 43 本角色交叉組合 V5（CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤）。",
+            page_home,
+        )
+        js_path = os.path.join(os.path.dirname(__file__), "..", "static", "paper.js")
+        with open(js_path, encoding="utf-8") as fh:
+            js = fh.read()
+        self.assertIn(
+            "等緊 Demo 排行榜傳上嚟。43 本角色交叉組合 V5（CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤）會喺度按名次排。",
+            js,
+        )
+        self.assertIn("(Array.isArray(d.books) ? d.books : [])", js)
+        self.assertIn("rows.map(demoBookDetail)", js)
+        self.assertNotIn("books.slice", js)
+        self.assertNotIn("rows.slice", js)
+        for stale in ("51 本", "單角色", "R0–R9", "十本", "角色矩陣 V4"):
+            self.assertNotIn(stale, demo_text)
+            self.assertNotIn(stale, page_home)
+            self.assertNotIn(stale, js)
         self.assertNotIn("D01–D10", page_home)
         self.assertNotIn("D01–D10", demo_text)
         self.assertIn("模擬盤，唔係真錢，唔係投資建議".encode(), demo.data)
@@ -182,6 +197,31 @@ class PaperIngestTests(unittest.TestCase):
         self.assertNotIn(b'id="books"', demo.data)
         self.assertIn("等緊 Demo 排行榜傳上嚟".encode(), demo.data)
         self.assertNotIn(b'id="funnel"', demo.data)
+
+    def test_leaderboard_keeps_every_book(self):
+        os.environ["PAPER_INGEST_TOKEN"] = "correct-token"
+        headers = {"Authorization": "Bearer correct-token", "Content-Type": "application/json"}
+        books = [{
+            "id": "B%02d" % i,
+            "label": "book-%d" % i,
+            "rank": i + 1,
+            "initialized": True,
+            "status": "running",
+            "kill": False,
+            "equity_usd": 50,
+            "ret_pct": 0,
+            "wins": 0,
+            "closed": 0,
+            "params": {},
+        } for i in range(43)]
+        payload = {"updated_hkt": "2026-11-06 21:00:00 HKT", "book_count": 43, "books": books}
+        res = self.client.post("/api/paper/ingest/leaderboard", data=json.dumps(payload), headers=headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["books"], 43)
+        paper_store.reset_memory()
+        board = self.client.get("/api/paper").get_json()["leaderboard"]["data"]
+        self.assertEqual(len(board["books"]), 43)
+        self.assertEqual([b["id"] for b in board["books"]], ["B%02d" % i for i in range(43)])
 
     def test_funnel_passthrough_and_page(self):
         os.environ["PAPER_INGEST_TOKEN"] = "correct-token"
