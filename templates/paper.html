@@ -4,33 +4,47 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07080c">
-<title>{% if methods_demo %}五方法紙盤｜METHODS_V1{% elif stocks_demo %}Demo 排行榜（36 本 · 美股交叉組合 V1）{% elif demo_only %}Demo 排行榜（78 本 · 角色交叉組合 V6）{% else %}$50 模擬盤成績{% endif %}</title>
+<title>{% if gold_demo %}黃金紙盤｜GOLD_V1{% elif methods_demo %}五方法紙盤｜METHODS_V1{% elif stocks_demo %}Demo 排行榜（36 本 · 美股交叉組合 V1）{% elif demo_only %}Demo 排行榜（78 本 · 角色交叉組合 V6）{% else %}$50 模擬盤成績{% endif %}</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2307080c'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%232fce85' font-family='sans-serif'%3E即%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/paper.css">
 </head>
-<body data-demo-only="{{ '1' if demo_only else '0' }}" data-market="{{ 'stocks' if stocks_demo else 'crypto' }}" data-methods="{{ '1' if methods_demo else '0' }}">
+<body data-demo-only="{{ '1' if demo_only else '0' }}" data-market="{{ 'stocks' if stocks_demo else 'crypto' }}" data-methods="{{ '1' if methods_demo else '0' }}" data-gold="{{ '1' if gold_demo else '0' }}">
 <a class="skip" href="#main">跳到內容</a>
 <div class="app">
 {% include "_rail.html" %}
 <header class="topbar">
   <div class="top-brand">
     <strong>即日鮮研究室</strong>
-    <span>{% if methods_demo %}五方法紙盤{% elif stocks_demo %}美股 Demo 排行{% elif demo_only %}Demo 排行榜{% else %}$50 模擬盤成績{% endif %}</span>
+    <span>{% if gold_demo %}黃金紙盤{% elif methods_demo %}五方法紙盤{% elif stocks_demo %}美股 Demo 排行{% elif demo_only %}Demo 排行榜{% else %}$50 模擬盤成績{% endif %}</span>
   </div>
   <p class="clock" id="clock" aria-live="off">—</p>
 </header>
 <div class="workspace">
-{% if methods_demo %}
+{% if gold_demo %}
+<p class="banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議</b> <span class="en">Paper trading only. Not real money. Not investment advice.</span> 只做 XAUUSD｜代理 GC=F｜模擬盤</p>
+{% elif methods_demo %}
 <p class="banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議</b> <span class="en">Paper trading only. Not real money. Not investment advice.</span> 五個策略各自計分，唔好同 $50 主盤或者 Demo 排行直接比較</p>
 {% else %}
 <p class="banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議。</b> <span class="en">Paper trading only. Not real money. Not investment advice.</span> 加密同美股成本假設唔同，唔好直接比較回報。</p>
 {% endif %}
 <main id="main">
 <header class="page-h">
-  {% if methods_demo %}
+  {% if gold_demo %}
+  <h1>黃金紙盤｜GOLD_V1</h1>
+  <p class="sub">只做 XAUUSD｜代理 GC=F｜模擬盤</p>
+  <p class="sub">四個黃金策略模擬倉，各由 $100 起步，我部電腦跑，呢度只係顯示成績</p>
+  <p class="sub">G1 TrendMA｜均線趨勢 · G2 MomBreak｜動量突破 · G4 MeanRev｜均值回歸（WARNING） · G5 TrendMASlow｜慢均線 50／200</p>
+  <p class="sub">G3 VolBreak｜波動突破｜回測回撤高過 20%，有數據先標 HOLD</p>
+  <p class="demo-links">
+    <a href="/paper">$50 模擬盤成績</a>
+    <a href="/paper/demo">加密 Demo 排行</a>
+    <a href="/paper/demo/stocks">美股 Demo 排行</a>
+    <a href="/paper/methods">五方法紙盤</a>
+  </p>
+  {% elif methods_demo %}
   <h1>五方法紙盤｜METHODS_V1</h1>
   <p class="sub">五個美股策略模擬倉，各由 $100 起步，我部電腦 24 小時跑，呢度只係顯示成績</p>
   <p class="sub">M1 MomBreak｜動量突破 · M2 TrendMA｜均線趨勢 · M3 VolBreak｜波動突破 · M4 MeanRev｜均值回歸 · M5 XSecMom｜相對強弱</p>
@@ -44,6 +58,7 @@
     <a href="/paper">$50 模擬盤成績</a>
     <a href="/paper/demo">加密 Demo 排行</a>
     <a href="/paper/demo/stocks">美股 Demo 排行</a>
+    <a href="/paper/gold">黃金紙盤</a>
   </p>
   {% elif stocks_demo %}
   <h1>Demo 排行榜（36 本 · 美股交叉組合 V1）</h1>
@@ -55,15 +70,22 @@
   <h1>$50 模擬盤成績</h1>
   <p class="sub">加密同美股係我部電腦 24 小時跑緊嘅模擬倉，唔係 Render 上面個示範盤。並行 Demo 係 78 本交叉組合（CTRL + CX/QX/AX/ZX）。</p>
   {% endif %}
-  {% if not methods_demo %}
+  {% if not methods_demo and not gold_demo %}
   <p class="demo-links">
     <a href="/paper/demo">加密 Demo 排行</a>
     <a href="/paper/demo/stocks">美股 Demo 排行</a>
     <a href="/paper/methods">五方法紙盤</a>
+    <a href="/paper/gold">黃金紙盤</a>
   </p>
   {% endif %}
 </header>
-{% if methods_demo %}
+{% if gold_demo %}
+<section class="card lb-card" aria-labelledby="gold-title">
+  <h2 id="gold-title">黃金紙盤｜GOLD_V1｜各 $100｜只做 XAUUSD</h2>
+  <p class="banner demo-banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議</b> <span class="en">Paper trading only. Not real money. Not investment advice.</span> 只做 XAUUSD｜代理 GC=F｜模擬盤</p>
+  <div id="gold" aria-busy="true"><p class="muted">等緊黃金紙盤傳上嚟</p></div>
+</section>
+{% elif methods_demo %}
 <section class="card lb-card" aria-labelledby="methods-title">
   <h2 id="methods-title">五方法紙盤｜METHODS_V1｜各 $100</h2>
   <p class="banner demo-banner" role="note"><b>模擬盤，唔係真錢，唔係投資建議</b> <span class="en">Paper trading only. Not real money. Not investment advice.</span></p>

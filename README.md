@@ -59,6 +59,15 @@ curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: ap
 
 `GET /api/paper` adds `leaderboard_methods` (`null` before the first push). The page is `/paper/methods`. The snapshot is `PAPER_STORE_DIR/leaderboard_methods.json`.
 
+The same token accepts the XAUUSD-only gold books (GOLD_V1, $100 each, Yahoo proxy `GC=F`). No new environment variable:
+
+```bash
+curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: application/json" \
+  --data-binary @gold_leaderboard.json https://<host>/api/paper/ingest/leaderboard_gold
+```
+
+`GET /api/paper` adds `leaderboard_gold` (`null` before the first push). The page is `/paper/gold`. Live books are G1 TrendMA, G2 MomBreak, G4 MeanRev, and G5 TrendMASlow. G3 is shown as HOLD when the payload includes it. The snapshot is `PAPER_STORE_DIR/leaderboard_gold.json`.
+
 `/paper` renders `crypto.data.funnel` when the always-on engine includes it: Scout→Filter→Analyst→Sniper→Guard counts (`seen` / `passed` / `skipped`) and the skipped/copied event log. Those numbers are the engine's own counts. Until a funnel object arrives, the section stays on the waiting line. `/paper/demo` does not show the funnel.
 
 When the US market is closed, the app replays the latest completed session at 10:15 AM New York

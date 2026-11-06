@@ -521,6 +521,192 @@ function methodsHtml(item) {
     <div class="method-grid">${rows.map(methodCard).join("")}</div>`;
 }
 
+const GOLD_SPECS = [
+  {id: "G1", code: "TrendMA", name_zh: "均線趨勢", name_en: "Trend Following MA", label: "G1 TrendMA｜均線趨勢｜XAUUSD"},
+  {id: "G2", code: "MomBreak", name_zh: "動量突破", name_en: "Momentum Breakout", label: "G2 MomBreak｜動量突破｜XAUUSD"},
+  {id: "G4", code: "MeanRev", name_zh: "均值回歸", name_en: "Mean Reversion", label: "G4 MeanRev｜均值回歸｜XAUUSD", warning: "逆勢；均值回歸，趨勢市風險高"},
+  {id: "G5", code: "TrendMASlow", name_zh: "慢均線 50／200", name_en: "Slow Trend MA", label: "G5 TrendMASlow｜慢均線 50／200｜XAUUSD"},
+];
+const GOLD_HOLD = {
+  id: "G3", code: "VolBreak", name_zh: "波動突破", name_en: "Volatility Breakout",
+  label: "G3 VolBreak｜波動突破｜XAUUSD", hold: true,
+};
+
+function goldSpec(id) {
+  if (id === "G3") return GOLD_HOLD;
+  for (let i = 0; i < GOLD_SPECS.length; i++) {
+    if (GOLD_SPECS[i].id === id) return GOLD_SPECS[i];
+  }
+  return null;
+}
+
+function goldMerge(spec, hit) {
+  const row = Object.assign({}, spec || {}, hit || {});
+  if ((row.warning == null || row.warning === "") && spec && spec.warning) row.warning = spec.warning;
+  if (spec && spec.hold) row.hold = true;
+  if (hit && hit.live_enabled === false) row.hold = true;
+  const status = String((hit && hit.status) || row.status || "").toLowerCase();
+  if (status === "hold" || status === "paused") row.hold = true;
+  if (String(row.id || "") === "G3") row.hold = true;
+  if (!row.symbol) row.symbol = "XAUUSD";
+  if (!row.yahoo_proxy) row.yahoo_proxy = "GC=F";
+  if (row.start_usd == null || row.start_usd === "") row.start_usd = 100;
+  return row;
+}
+
+function goldRows(d) {
+  const live = d && Array.isArray(d.books) ? d.books.filter((b) => b && typeof b === "object") : [];
+  const base = {
+    symbol: d && d.symbol ? d.symbol : "XAUUSD",
+    yahoo_proxy: d && d.yahoo_proxy ? d.yahoo_proxy : "GC=F",
+    start_usd: d && d.start_usd != null && d.start_usd !== "" ? d.start_usd : 100,
+  };
+  if (!live.length) return GOLD_SPECS.map((s) => Object.assign({waiting: true}, base, s));
+  const byId = {};
+  live.forEach((b) => {
+    if (b.id != null && b.id !== "") byId[String(b.id)] = b;
+  });
+  const seen = {};
+  const rows = [];
+  ["G1", "G2", "G3", "G4", "G5"].forEach((id) => {
+    const spec = goldSpec(id);
+    const hit = byId[id];
+    if (!hit) {
+      if (id === "G3") return;
+      rows.push(Object.assign({waiting: true}, base, spec));
+      return;
+    }
+    seen[id] = true;
+    rows.push(goldMerge(Object.assign({}, base, spec), hit));
+  });
+  live.forEach((b) => {
+    const id = b.id == null ? "" : String(b.id);
+    if (id && seen[id]) return;
+    rows.push(goldMerge(Object.assign({}, base, id === "G3" ? {hold: true} : {}), b));
+  });
+  return rows;
+}
+
+function goldBacktest(b) {
+  const bt = b && b.backtest && typeof b.backtest === "object" ? Object.assign({}, b.backtest) : {};
+  if ((bt.net_pct == null || bt.net_pct === "") && b && b.backtest_net_pct != null) bt.net_pct = b.backtest_net_pct;
+  if ((bt.max_dd_pct == null || bt.max_dd_pct === "") && b && b.backtest_max_dd_pct != null) bt.max_dd_pct = b.backtest_max_dd_pct;
+  if ((bt.closed == null || bt.closed === "") && b && b.backtest_closed != null) bt.closed = b.backtest_closed;
+  if (bt.net_pct == null && bt.max_dd_pct == null && bt.closed == null) return null;
+  return bt;
+}
+
+function goldWarnings(b) {
+  const out = [];
+  if (b && b.warning) out.push(String(b.warning));
+  const nested = b && b.backtest && Array.isArray(b.backtest.warning_flags) ? b.backtest.warning_flags : [];
+  const flat = b && Array.isArray(b.warning_flags) ? b.warning_flags : [];
+  nested.concat(flat).forEach((f) => {
+    if (f && out.indexOf(String(f)) < 0) out.push(String(f));
+  });
+  return out;
+}
+
+function goldRet(b) {
+  if (!b || b.waiting) return null;
+  if (b.ret_pct != null && b.ret_pct !== "" && Number.isFinite(Number(b.ret_pct))) return Number(b.ret_pct);
+  const eq = Number(b.equity_usd);
+  const start = Number(b.start_usd == null || b.start_usd === "" ? 100 : b.start_usd);
+  if (Number.isFinite(eq) && Number.isFinite(start) && start) return ((eq - start) / start) * 100;
+  return null;
+}
+
+function goldOpenCount(b) {
+  if (!b || b.waiting) return "—";
+  if (b.open_positions != null && b.open_positions !== "") return String(b.open_positions);
+  if (Array.isArray(b.positions)) return String(b.positions.length);
+  if (b.positions != null && b.positions !== "" && Number.isFinite(Number(b.positions))) return String(b.positions);
+  return "0";
+}
+
+function goldPositions(b) {
+  const positions = Array.isArray(b.positions) ? b.positions : [];
+  if (!positions.length) {
+    const n = goldOpenCount(b);
+    if (!b.waiting && n !== "—" && n !== "0") return `<p class="muted">持倉 ${esc(n)}，未有明細</p>`;
+    return `<p class="muted">${b.waiting ? "等緊數據" : "未有持倉"}</p>`;
+  }
+  const rows = positions.map((p) => `<tr>
+    <td><b>${esc(p.symbol || b.symbol || "XAUUSD")}</b></td>
+    <td class="num">${esc(dash(p.qty))}</td>
+    <td class="num">${usd(p.entry_usd)}</td>
+    <td class="num">${usd(p.last_usd)}</td>
+    <td class="num ${cls(Number(p.upnl_usd))}">${usd(p.upnl_usd, 2)}</td>
+    <td>${esc(p.why || p.reason || "—")}</td>
+  </tr>`).join("");
+  return `<div class="scroll"><table><thead><tr><th>代號</th><th>數量</th><th>入場</th><th>而家</th><th>浮動</th><th>原因</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function goldHoldLine(b) {
+  const bt = goldBacktest(b);
+  const dd = bt && bt.max_dd_pct != null && bt.max_dd_pct !== "" && Number.isFinite(Number(bt.max_dd_pct))
+    ? Number(bt.max_dd_pct) : null;
+  const why = dd != null && dd > 20
+    ? "回測最大回撤 " + dd.toFixed(2) + "% 高過 20%，未開模擬倉"
+    : "未開模擬倉";
+  return `<p class="gold-hold" role="note"><b>HOLD</b> ${esc(why)}</p>`;
+}
+
+function goldCard(b) {
+  const label = b.label || `${b.id || ""} ${b.code || ""}｜${b.name_zh || ""}`.replace(/｜$/, "");
+  const zh = b.name_zh ? String(b.name_zh) : "";
+  const en = b.name_en ? String(b.name_en) : "";
+  const ret = goldRet(b);
+  const start = b.start_usd == null || b.start_usd === "" ? 100 : b.start_usd;
+  const flags = goldWarnings(b);
+  const hold = b.hold === true;
+  const bt = !b.waiting ? goldBacktest(b) : null;
+  const dd = bt && bt.max_dd_pct != null && bt.max_dd_pct !== "" && Number.isFinite(Number(bt.max_dd_pct))
+    ? Number(bt.max_dd_pct).toFixed(2) + "%" : "—";
+  const btLine = bt ? `<p class="note">回測淨利 ${esc(pctPoints(bt.net_pct))} · 最大回撤 ${esc(dd)}</p>` : "";
+  const warn = hold
+    ? goldHoldLine(b)
+    : (flags.length
+      ? `<p class="method-warn" role="note"><b>WARNING</b> ${esc(flags.join(" · "))}</p>`
+      : `<p class="note">${b.waiting ? "回測警示：等緊數據" : "回測警示：無"}</p>`);
+  const badge = hold ? `<span class="combo">HOLD</span>` : (flags.length ? `<span class="combo family">WARNING</span>` : "");
+  const sym = b.symbol || "XAUUSD";
+  const proxy = b.yahoo_proxy || "GC=F";
+  const tick = b.last_tick_hkt || b.state_saved_hkt;
+  return `<article class="card method-card${hold ? " is-hold" : ""}" id="gold-${esc(b.id || "")}">
+    <h3><span class="num">${esc(b.id || "—")}</span> ${esc(b.code || "")}${badge}</h3>
+    <p class="method-name">${esc(zh || label)}${en ? `<span class="en">${esc(en)}</span>` : ""}</p>
+    <p class="note">${esc(label)}</p>
+    <p class="note">只做 ${esc(sym)}｜代理 ${esc(proxy)}｜模擬盤</p>
+    <div class="kpis">
+      ${kpi("權益", `<span class="${cls(ret)}">${usd(b.equity_usd, 2)}</span>`)}
+      ${kpi("現金", b.waiting ? "—" : usd(b.cash_usd, 2))}
+      ${kpi("已平倉", b.waiting ? "—" : esc(dash(b.closed)))}
+      ${kpi("持倉", esc(goldOpenCount(b)))}
+    </div>
+    <p class="note">起始 ${esc(usd(start, 0))}${ret == null ? "" : " · 回報 " + esc(pctPoints(ret))}${tick ? " · 最後 tick " + esc(fmtHKT(tick)) : ""}</p>
+    <p class="note">${esc(b.note || (b.waiting ? "等緊數據傳上嚟" : "只做 XAUUSD｜代理 GC=F｜模擬盤"))}</p>
+    ${warn}
+    ${btLine}
+    <section class="book-sec" aria-label="持倉"><h4>持倉</h4>${goldPositions(b)}</section>
+  </article>`;
+}
+
+function goldHtml(item) {
+  const d = item && item.data && typeof item.data === "object" ? item.data : null;
+  const rows = goldRows(d);
+  const received = item ? parseTime(item.received_at) : null;
+  const stale = received != null && Date.now() - received > 10 * 60 * 1000;
+  const updated = d && (d.generated_hkt || d.updated_hkt) ? String(d.generated_hkt || d.updated_hkt) : "";
+  const start = d && d.start_usd != null && d.start_usd !== "" ? d.start_usd : 100;
+  const sym = d && d.symbol ? String(d.symbol) : "XAUUSD";
+  const proxy = d && d.yahoo_proxy ? String(d.yahoo_proxy) : "GC=F";
+  const freshness = !d ? " · 等緊黃金紙盤傳上嚟" : (stale ? ` · <span class="stale">數據可能過時（我部電腦暫停中）</span>` : (received ? " · " + esc(ago(received)) : ""));
+  return `<p class="note">只做 ${esc(sym)}｜代理 ${esc(proxy)}｜模擬盤</p>
+    <p class="note">今次 ${rows.length} 本 · 起始 ${esc(usd(start, 0))}${updated ? " · " + esc(updated) : ""}${freshness}</p>
+    <div class="method-grid">${rows.map(goldCard).join("")}</div>`;
+}
+
 async function load() {
   const r = await fetch("/api/paper");
   if (!r.ok) throw new Error("讀唔到成績");
@@ -535,6 +721,11 @@ async function load() {
   if (methods) {
     methods.innerHTML = methodsHtml(j && j.leaderboard_methods);
     methods.removeAttribute("aria-busy");
+  }
+  const gold = $("#gold");
+  if (gold) {
+    gold.innerHTML = goldHtml(j && j.leaderboard_gold);
+    gold.removeAttribute("aria-busy");
   }
   const funnel = $("#funnel");
   if (funnel) funnel.innerHTML = funnelHtml(j && j.crypto);
@@ -553,6 +744,8 @@ load().catch((e) => {
   if (lb) lb.textContent = e.message;
   const methods = $("#methods");
   if (methods) methods.textContent = e.message;
+  const gold = $("#gold");
+  if (gold) gold.textContent = e.message;
   const funnel = $("#funnel");
   if (funnel) funnel.textContent = e.message;
   const books = $("#books");
