@@ -165,28 +165,26 @@ class PaperIngestTests(unittest.TestCase):
         demo = self.client.get("/paper/demo")
         self.assertEqual(demo.status_code, 200)
         demo_text = demo.data.decode()
-        title = "Demo 排行榜（43 本 · 角色交叉組合 V5）"
-        sub = "CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤。預設顯示持倉同成交。"
+        title = "Demo 排行榜（78 本 · 角色交叉組合 V6）"
+        sub = "CTRL 對照；CX＝E×K×N×S0G0；QX＝同網格×S1G1 品質；AX＝E1/E2×K×N×S2G2 進攻；ZX＝SCAN/RUG 混拼。預設顯示持倉同成交同 combo。"
         self.assertEqual(demo_text.count(title), 3)
         self.assertIn(sub, demo_text)
         page_home = page.data.decode()
         self.assertIn(title, page_home)
-        self.assertIn(
-            "並行 Demo 係 43 本角色交叉組合 V5（CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤）。",
-            page_home,
-        )
+        self.assertIn("並行 Demo 係 78 本交叉組合（CTRL + CX/QX/AX/ZX）。", page_home)
         js_path = os.path.join(os.path.dirname(__file__), "..", "static", "paper.js")
         with open(js_path, encoding="utf-8") as fh:
             js = fh.read()
-        self.assertIn(
-            "等緊 Demo 排行榜傳上嚟。43 本角色交叉組合 V5（CTRL 對照；CX = EXIT×RISK×SNIPER 交叉；MX = 主軸再疊 SCAN×RUG；ZX = 多角色極致拼盤）會喺度按名次排。",
-            js,
-        )
+        self.assertIn("等緊 Demo 排行榜傳上嚟。", js)
+        self.assertIn("本交叉組合（CTRL + CX/QX/AX/ZX）", js)
+        self.assertIn(': "78"', js)
+        self.assertIn("bookCombo", js)
+        self.assertIn("matrixWait", js)
         self.assertIn("(Array.isArray(d.books) ? d.books : [])", js)
         self.assertIn("rows.map(demoBookDetail)", js)
         self.assertNotIn("books.slice", js)
         self.assertNotIn("rows.slice", js)
-        for stale in ("51 本", "單角色", "R0–R9", "十本", "角色矩陣 V4"):
+        for stale in ("51 本", "43 本", "V4", "V5", "MX", "單角色", "R0–R9", "十本", "角色矩陣", "EXIT/RISK"):
             self.assertNotIn(stale, demo_text)
             self.assertNotIn(stale, page_home)
             self.assertNotIn(stale, js)
@@ -204,6 +202,7 @@ class PaperIngestTests(unittest.TestCase):
         books = [{
             "id": "B%02d" % i,
             "label": "book-%d" % i,
+            "combo": "E1-K0-N1-S1-G1",
             "rank": i + 1,
             "initialized": True,
             "status": "running",
@@ -212,16 +211,32 @@ class PaperIngestTests(unittest.TestCase):
             "ret_pct": 0,
             "wins": 0,
             "closed": 0,
+            "positions": [],
+            "trades": [],
             "params": {},
-        } for i in range(43)]
-        payload = {"updated_hkt": "2026-11-06 21:00:00 HKT", "book_count": 43, "books": books}
+        } for i in range(78)]
+        books[0]["positions"] = [{"symbol": "TEST", "ret": 0.01}]
+        books[0]["trades"] = [{"symbol": "TEST", "side": "buy"}]
+        payload = {
+            "updated_hkt": "2026-11-06 21:00:00 HKT",
+            "book_count": 78,
+            "matrix_version": 6,
+            "matrix_label": "MATRIX_V6",
+            "books": books,
+        }
         res = self.client.post("/api/paper/ingest/leaderboard", data=json.dumps(payload), headers=headers)
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.get_json()["books"], 43)
+        self.assertEqual(res.get_json()["books"], 78)
         paper_store.reset_memory()
         board = self.client.get("/api/paper").get_json()["leaderboard"]["data"]
-        self.assertEqual(len(board["books"]), 43)
-        self.assertEqual([b["id"] for b in board["books"]], ["B%02d" % i for i in range(43)])
+        self.assertEqual(board["book_count"], 78)
+        self.assertEqual(board["matrix_version"], 6)
+        self.assertEqual(len(board["books"]), 78)
+        self.assertEqual([b["id"] for b in board["books"]], ["B%02d" % i for i in range(78)])
+        self.assertEqual(board["books"][0]["combo"], "E1-K0-N1-S1-G1")
+        self.assertEqual(board["books"][0]["positions"][0]["symbol"], "TEST")
+        self.assertEqual(board["books"][0]["trades"][0]["side"], "buy")
+        self.assertEqual(board["books"][-1]["id"], "B77")
 
     def test_funnel_passthrough_and_page(self):
         os.environ["PAPER_INGEST_TOKEN"] = "correct-token"
