@@ -50,6 +50,15 @@ curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: ap
 
 `GET /api/paper` adds `leaderboard` and `leaderboard_stocks` (`null` before the first push). Crypto ranks are on `/paper` and `/paper/demo` (78 本 · 角色交叉組合 V6). US-stock ranks are on `/paper/demo/stocks` (36 本 · 美股交叉組合 V1). Snapshots are `PAPER_STORE_DIR/leaderboard.json` and `leaderboard_stocks.json` (default `/tmp/paper_store`), same ephemeral disk as the two books: a restart drops them until the always-on machine pushes again.
 
+The same token accepts the five US-stock method books (METHODS_V1, $100 each). No new environment variable:
+
+```bash
+curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: application/json" \
+  --data-binary @methods_leaderboard.json https://<host>/api/paper/ingest/leaderboard_methods
+```
+
+`GET /api/paper` adds `leaderboard_methods` (`null` before the first push). The page is `/paper/methods`. The snapshot is `PAPER_STORE_DIR/leaderboard_methods.json`.
+
 `/paper` renders `crypto.data.funnel` when the always-on engine includes it: Scout→Filter→Analyst→Sniper→Guard counts (`seen` / `passed` / `skipped`) and the skipped/copied event log. Those numbers are the engine's own counts. Until a funnel object arrives, the section stays on the waiting line. `/paper/demo` does not show the funnel.
 
 When the US market is closed, the app replays the latest completed session at 10:15 AM New York
