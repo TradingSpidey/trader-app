@@ -225,9 +225,14 @@ function handoff() {
   step();
 }
 
-function usdAmt(v, sign) {
-  if (v == null || Number.isNaN(Number(v))) return null;
+function finite(v) {
+  if (v == null || v === "") return null;
   const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function usdAmt(v, sign) {
+  const n = finite(v);
+  if (n == null) return null;
   const body = Math.abs(n).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
   if (n < 0) return "-$" + body;
   return (sign && n > 0 ? "+$" : "$") + body;
@@ -235,26 +240,29 @@ function usdAmt(v, sign) {
 function showTitle(which) {
   return which === "stocks" ? "主盤 SHOW｜$100｜Demo STOCKS_V1 CTRL" : "主盤 SHOW｜$100｜Demo 暫定最佳 CTRL";
 }
+function kpiFigures(j) {
+  const a = j.account || {};
+  const px = finite(j.sol_usd);
+  let equity = finite(a.equity_usd);
+  if (equity == null && finite(a.equity_sol) != null && px != null) equity = finite(a.equity_sol) * px;
+  if (equity == null && finite(a.cash_usd) != null && !(j.positions || []).length) equity = finite(a.cash_usd);
+  const start = finite(a.start_usd) != null ? finite(a.start_usd) : (finite(a.trial_usd) != null ? finite(a.trial_usd) : 100);
+  let pnl = finite(a.day_pnl_usd);
+  if (pnl == null && equity != null) pnl = equity - start;
+  return {equity: equity, pnl: pnl, start: start, px: px};
+}
 function render(j) {
   market = j.market === "stocks" ? "stocks" : "crypto";
   const a = j.account || {};
-  const solPx = Number(j.sol_usd);
-  let equityUsd = a.equity_usd == null ? null : Number(a.equity_usd);
-  if ((equityUsd == null || Number.isNaN(equityUsd)) && market !== "stocks" && solPx > 0) {
-    const solEq = a.equity_sol != null ? Number(a.equity_sol) : (a.cash_sol != null ? Number(a.cash_sol) : null);
-    if (solEq != null && !Number.isNaN(solEq)) equityUsd = solEq * solPx;
-  }
-  if ((equityUsd == null || Number.isNaN(equityUsd)) && market === "stocks" && a.cash_usd != null && !(j.positions || []).length) {
-    equityUsd = Number(a.cash_usd);
-  }
-  const startUsd = a.start_usd != null ? Number(a.start_usd) : (a.trial_usd != null ? Number(a.trial_usd) : 100);
-  let pnlUsd = a.day_pnl_usd == null ? null : Number(a.day_pnl_usd);
-  if ((pnlUsd == null || Number.isNaN(pnlUsd)) && equityUsd != null && !Number.isNaN(startUsd)) pnlUsd = equityUsd - startUsd;
-  const equityText = equityUsd == null || Number.isNaN(equityUsd)
-    ? "—"
-    : ("≈ " + usdAmt(equityUsd, false) + (market !== "stocks" && a.equity_sol != null ? " · " + num(a.equity_sol, 4) + " SOL" : ""));
-  const pnlText = pnlUsd == null || Number.isNaN(pnlUsd) ? "—" : usdAmt(pnlUsd, true);
-  const startText = "≈ $" + num(startUsd, 0) + (market !== "stocks" && a.start_sol != null ? " · " + num(a.start_sol, 4) + " SOL" : "");
+  const kpi = kpiFigures(j);
+  const equityUsd = kpi.equity;
+  const pnlUsd = kpi.pnl;
+  const startUsd = kpi.start;
+  const solNote = kpi.px != null && finite(a.equity_sol) != null ? " · " + num(a.equity_sol, 4) + " SOL" : "";
+  const startSol = kpi.px != null && finite(a.start_sol) != null ? " · " + num(a.start_sol, 4) + " SOL" : "";
+  const equityText = equityUsd == null ? "—" : usdAmt(equityUsd, false) + solNote;
+  const pnlText = pnlUsd == null ? "—" : usdAmt(pnlUsd, true);
+  const startText = "≈ $" + num(startUsd, 0) + startSol;
   $("#stats").innerHTML = `
     <div class="stat"><span>今日模擬盈虧</span><b class="num ${pnlUsd == null ? "" : cls(pnlUsd)}">${esc(pnlText)}</b></div>
     <div class="stat"><span>勝率（已平倉）</span><b class="num">${esc(winText(a))}</b></div>
@@ -273,7 +281,7 @@ function render(j) {
   const title = j.badge || showTitle(market);
   $("#kicker").textContent = title;
   const demo = $("#demo-note");
-  if (demo) demo.textContent = title;
+  if (demo) demo.textContent = title + "｜起始 ≈ $" + num(startUsd, 0);
   $("#m-crypto").classList.toggle("on", market !== "stocks");
   $("#m-stocks").classList.toggle("on", market === "stocks");
   $("#m-crypto").setAttribute("aria-selected", market !== "stocks" ? "true" : "false");
@@ -343,8 +351,8 @@ function render(j) {
 
   $("#rules").innerHTML = `<h2>規則</h2><ol>${(j.rules || []).map((r) => `<li>${esc(r)}</li>`).join("")}</ol>`;
   const err = (j.errors || []).join(" ");
-  const solPx = market === "stocks" ? "" : ` SOL 報價：${esc(usd(j.sol_usd))}（${esc(j.sol_source || "暫無數據")}）。`;
-  $("#foot").innerHTML = `行情來源：${esc((j.sources && j.sources.market || []).join("、"))}。盈虧係${esc(j.sources && j.sources.paper)}。${solPx}${err ? `<span class="err">${esc(err)}</span>` : ""}`;
+  const solLine = market === "stocks" || finite(j.sol_usd) == null ? "" : ` SOL 報價：${esc(usd(j.sol_usd))}（${esc(j.sol_source || "暫無數據")}）。`;
+  $("#foot").innerHTML = `行情來源：${esc((j.sources && j.sources.market || []).join("、"))}。盈虧係${esc(j.sources && j.sources.paper)}。${solLine}${err ? `<span class="err">${esc(err)}</span>` : ""}`;
 }
 
 function api(path) {
