@@ -48,6 +48,8 @@ curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: ap
 
 `GET /api/paper` adds `leaderboard` (`null` before the first push). The ranked table is on `/paper` and `/paper/demo`. The snapshot is `PAPER_STORE_DIR/leaderboard.json` (default `/tmp/paper_store`), same ephemeral disk as the two books: a restart drops it until the always-on machine pushes again.
 
+`/paper` renders `crypto.data.funnel` when the always-on engine includes it: Scout→Filter→Analyst→Sniper→Guard counts (`seen` / `passed` / `skipped`) and the skipped/copied event log. Those numbers are the engine's own counts. Until a funnel object arrives, the section stays on the waiting line. `/paper/demo` does not show the funnel.
+
 When the US market is closed, the app replays the latest completed session at 10:15 AM New York
 time (or the time you type, 09:50–15:30) using the tools' `--now` option. While the market is open
 it uses the current (delayed) bars. `/api/bars` returns that same session's closed 5-minute bars

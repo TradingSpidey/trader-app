@@ -139,6 +139,44 @@ class PaperIngestTests(unittest.TestCase):
         self.assertIn(b"Paper trading only. Not real money. Not investment advice.", demo.data)
         self.assertNotIn(b'id="books"', demo.data)
         self.assertIn("等緊 Demo 排行榜傳上嚟".encode(), demo.data)
+        self.assertNotIn(b'id="funnel"', demo.data)
+
+    def test_funnel_passthrough_and_page(self):
+        os.environ["PAPER_INGEST_TOKEN"] = "correct-token"
+        headers = {"Authorization": "Bearer correct-token", "Content-Type": "application/json"}
+        crypto = _sample("sample_crypto")
+        crypto["funnel"] = {
+            "disclaimer": "模擬盤 Copy Funnel",
+            "scout": {"wallets_n": 12, "flow_n": 40, "matched": 7, "min_buy_usd": 500},
+            "stages": [
+                {"id": "scout", "label": "Scout", "seen": 40, "passed": 12, "skipped": 28, "detail": "錢包"},
+                {"id": "filter", "label": "Filter", "seen": 12, "passed": 8, "skipped": 4, "detail": "流動性"},
+                {"id": "analyst", "label": "Analyst", "seen": 8, "passed": 3, "skipped": 5, "detail": "分析"},
+                {"id": "sniper", "label": "Sniper", "seen": 3, "passed": 1, "skipped": 2, "detail": "入場"},
+                {"id": "guard", "label": "Guard", "seen": 1, "passed": 1, "skipped": 0, "detail": "風控"},
+            ],
+            "events": [
+                {"ts": "2026-11-06T12:00:00Z", "action": "skip", "stage": "Filter", "symbol": "SKIP", "reason": "流動性不足"},
+                {"ts": "2026-11-06T12:01:00Z", "action": "copy", "stage": "Guard", "symbol": "COPY", "reason": "過晒風控"},
+            ],
+        }
+        ok = self.client.post("/api/paper/ingest/crypto", data=json.dumps(crypto), headers=headers)
+        self.assertEqual(ok.status_code, 200)
+        paper_store.reset_memory()
+        body = self.client.get("/api/paper").get_json()
+        funnel = body["crypto"]["data"]["funnel"]
+        self.assertEqual([s["label"] for s in funnel["stages"]], ["Scout", "Filter", "Analyst", "Sniper", "Guard"])
+        self.assertEqual(funnel["stages"][0]["seen"], 40)
+        self.assertEqual([e["action"] for e in funnel["events"]], ["skip", "copy"])
+        page = self.client.get("/paper")
+        self.assertIn(b'id="funnel"', page.data)
+        self.assertIn("Copy Funnel（模擬）".encode(), page.data)
+        self.assertIn("Scout→Filter→Analyst→Sniper→Guard".encode(), page.data)
+        self.assertIn("數字嚟自引擎，唔係宣傳回報".encode(), page.data)
+        self.assertIn("模擬盤，唔係真錢，唔係投資建議".encode(), page.data)
+        demo = self.client.get("/paper/demo")
+        self.assertNotIn(b'id="funnel"', demo.data)
+        self.assertIn(b'id="leaderboard"', demo.data)
 
 
 if __name__ == "__main__":

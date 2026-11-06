@@ -248,18 +248,52 @@ function bookCard(name, book, item) {
   </article>`;
 }
 
+
+function funnelHtml(item) {
+  const data = item && item.data ? item.data : item;
+  const f = data && data.funnel;
+  if (!f || !Array.isArray(f.stages) || !f.stages.length) {
+    return `<p class="muted">等緊 Copy Funnel 傳上嚟（引擎會推 Scout→Filter→Analyst→Sniper→Guard）。</p>`;
+  }
+  const scout = f.scout || (data && data.scout) || {};
+  const stages = f.stages.map((s) => `<div class="funnel-stage">
+    <b>${esc(s.label || s.id)}</b>
+    <div class="counts">見過 ${esc(dash(s.seen))} · 過 ${esc(dash(s.passed))} · 跳過 ${esc(dash(s.skipped))}</div>
+    <div class="detail">${esc(s.detail || "")}</div>
+  </div>`).join("");
+  const events = Array.isArray(f.events) ? f.events : [];
+  const log = events.length ? `<ol class="funnel-log">${events.map((e) => {
+    const act = String(e.action || "");
+    const tag = act === "skip" ? "skip" : act === "copy" ? "copy" : act === "exit" ? "exit" : "pass";
+    return `<li><time class="num">${esc(fmtHKT(e.ts))}</time>
+      <span class="tag ${tag}">${esc(act || "—")}</span>
+      <b>${esc(e.stage || "")}</b> ${esc(e.symbol || "—")}
+      <div class="muted">${esc(e.reason || "")}</div></li>`;
+  }).join("")}</ol>` : `<p class="muted">未有 skipped／copied 日誌</p>`;
+  const scoutLine = `Scout 錢包 ${esc(dash(scout.wallets_n))} · flow ${esc(dash(scout.flow_n))} · 對上池 ${esc(dash(scout.matched))}${scout.min_buy_usd != null ? ` · 大額門檻 $${esc(String(scout.min_buy_usd))}` : ""}`;
+  return `<p class="note">${esc(f.disclaimer || "模擬盤 Copy Funnel")}</p>
+    <p class="note">${scoutLine}</p>
+    <div class="funnel-stages">${stages}</div>
+    <h2 style="margin-top:12px">最近 skipped／copied</h2>
+    ${log}`;
+}
+
 async function load() {
   const r = await fetch("/api/paper");
   if (!r.ok) throw new Error("讀唔到成績");
   const j = await r.json();
   const lb = $("#leaderboard");
   if (lb) lb.innerHTML = leaderboardHtml(j && j.leaderboard);
+  const funnel = $("#funnel");
+  if (funnel) funnel.innerHTML = funnelHtml(j && j.crypto);
   const books = $("#books");
   if (books) books.innerHTML = `<div class="books">${bookCard("加密貨幣", "crypto", j.crypto)}${bookCard("美股", "stocks", j.stocks)}</div>`;
 }
 load().catch((e) => {
   const lb = $("#leaderboard");
   if (lb) lb.textContent = e.message;
+  const funnel = $("#funnel");
+  if (funnel) funnel.textContent = e.message;
   const books = $("#books");
   if (books) books.textContent = e.message;
 });
