@@ -1,0 +1,80 @@
+{
+  "matrix_id": "BTC_V1",
+  "symbol": "BTCUSDT",
+  "session": "24/7",
+  "start_usd": 100.0,
+  "disclaimer": "模擬盤，唔係真錢，唔係投資建議",
+  "generated_hkt": "2026-11-07 20:26:11 HKT",
+  "books": [
+    {
+      "id": "B1",
+      "label": "B1 TrendMA｜均線趨勢｜BTCUSDT",
+      "live_enabled": true,
+      "equity_usd": 100.0,
+      "cash_usd": 100.0,
+      "positions": 0,
+      "closed": 0,
+      "last_tick_hkt": "2026-11-07 20:26:07 HKT",
+      "backtest_net_pct": 15.29,
+      "backtest_max_dd_pct": 14.88,
+      "symbol": "BTCUSDT",
+      "warning": null
+    },
+    {
+      "id": "B2",
+      "label": "B2 MomBreak｜動量突破｜BTCUSDT",
+      "live_enabled": true,
+      "equity_usd": 100.0,
+      "cash_usd": 100.0,
+      "positions": 0,
+      "closed": 0,
+      "last_tick_hkt": "2026-11-07 20:26:07 HKT",
+      "backtest_net_pct": 25.63,
+      "backtest_max_dd_pct": 14.0,
+      "symbol": "BTCUSDT",
+      "warning": null
+    },
+    {
+      "id": "B3",
+      "label": "B3 VolBreak｜波動突破｜BTCUSDT",
+      "live_enabled": true,
+      "equity_usd": 100.0,
+      "cash_usd": 100.0,
+      "positions": 0,
+      "closed": 0,
+      "last_tick_hkt": "2026-11-07 20:26:07 HKT",
+      "backtest_net_pct": 23.94,
+      "backtest_max_dd_pct": 15.14,
+      "symbol": "BTCUSDT",
+      "warning": null
+    },
+    {
+      "id": "B4",
+      "label": "B4 MeanRev｜均值回歸嚴｜BTCUSDT",
+      "live_enabled": true,
+      "equity_usd": 100.0,
+      "cash_usd": 100.0,
+      "positions": 0,
+      "closed": 0,
+      "last_tick_hkt": "2026-11-07 20:26:07 HKT",
+      "backtest_net_pct": 8.83,
+      "backtest_max_dd_pct": 15.66,
+      "symbol": "BTCUSDT",
+      "warning": "逆勢；單邊趨勢易接飛刀｜WARNING"
+    },
+    {
+      "id": "B5",
+      "label": "B5 TrendMASlow｜慢均線 50／200｜BTCUSDT",
+      "live_enabled": false,
+      "equity_usd": 100.0,
+      "cash_usd": 100.0,
+      "positions": 0,
+      "closed": 0,
+      "last_tick_hkt": null,
+      "backtest_net_pct": -4.54,
+      "backtest_max_dd_pct": 23.36,
+      "symbol": "BTCUSDT",
+      "warning": null
+    }
+  ]
+}

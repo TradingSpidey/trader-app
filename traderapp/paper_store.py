@@ -9,6 +9,7 @@ LEADERBOARD = "leaderboard"
 LEADERBOARD_STOCKS = "leaderboard_stocks"
 LEADERBOARD_METHODS = "leaderboard_methods"
 LEADERBOARD_GOLD = "leaderboard_gold"
+LEADERBOARD_BTC = "leaderboard_btc"
 MAX_BODY = 2 * 1024 * 1024
 _lock = threading.Lock()
 _mem = {
@@ -18,6 +19,7 @@ _mem = {
     "leaderboard_stocks": None,
     "leaderboard_methods": None,
     "leaderboard_gold": None,
+    "leaderboard_btc": None,
 }
 
 
@@ -33,6 +35,7 @@ def reset_memory():
         _mem["leaderboard_stocks"] = None
         _mem["leaderboard_methods"] = None
         _mem["leaderboard_gold"] = None
+        _mem["leaderboard_btc"] = None
 
 
 def _path(book):
@@ -88,7 +91,7 @@ def ingest(book, raw):
 def ingest_leaderboard(raw, key=None):
     """Overwrite one demo leaderboard. Paper only. Crypto stays on `leaderboard`."""
     key = key or LEADERBOARD
-    if key not in (LEADERBOARD, LEADERBOARD_STOCKS, LEADERBOARD_METHODS, LEADERBOARD_GOLD):
+    if key not in (LEADERBOARD, LEADERBOARD_STOCKS, LEADERBOARD_METHODS, LEADERBOARD_GOLD, LEADERBOARD_BTC):
         return {"error": "書名唔啱"}, 400
     data, err = _parse_object(raw)
     if err:
@@ -261,7 +264,7 @@ def load_leaderboard():
 
 def load_all():
     with _lock:
-        for book in BOOKS + (LEADERBOARD, LEADERBOARD_STOCKS, LEADERBOARD_METHODS, LEADERBOARD_GOLD):
+        for book in BOOKS + (LEADERBOARD, LEADERBOARD_STOCKS, LEADERBOARD_METHODS, LEADERBOARD_GOLD, LEADERBOARD_BTC):
             if _mem.get(book) is None:
                 _mem[book] = _read_disk(book)
         out = {book: _public(_mem.get(book)) for book in BOOKS}
@@ -269,4 +272,5 @@ def load_all():
         out[LEADERBOARD_STOCKS] = _public(_mem.get(LEADERBOARD_STOCKS))
         out[LEADERBOARD_METHODS] = _public(_mem.get(LEADERBOARD_METHODS))
         out[LEADERBOARD_GOLD] = _public(_mem.get(LEADERBOARD_GOLD))
+        out[LEADERBOARD_BTC] = _public(_mem.get(LEADERBOARD_BTC))
         return out

@@ -194,6 +194,16 @@ def api_paper_ingest_leaderboard_gold():
     return jsonify(body), code
 
 
+@app.post("/api/paper/ingest/leaderboard_btc")
+def api_paper_ingest_leaderboard_btc():
+    denied = _ingest_denied()
+    if denied:
+        return denied
+    raw = request.get_data(cache=False) or b""
+    body, code = paper_store.ingest_leaderboard(raw, paper_store.LEADERBOARD_BTC)
+    return jsonify(body), code
+
+
 @app.post("/api/paper/ingest/<book>")
 def api_paper_ingest(book):
     denied = _ingest_denied()
@@ -212,31 +222,37 @@ def api_paper():
 @app.get("/paper")
 def paper_page():
     return render_template(
-        "paper.html", demo_only=False, stocks_demo=False, methods_demo=False, gold_demo=False)
+        "paper.html", demo_only=False, stocks_demo=False, methods_demo=False, gold_demo=False, btc_demo=False)
 
 
 @app.get("/paper/methods")
 def paper_methods_page():
     return render_template(
-        "paper.html", demo_only=False, stocks_demo=False, methods_demo=True, gold_demo=False)
+        "paper.html", demo_only=False, stocks_demo=False, methods_demo=True, gold_demo=False, btc_demo=False)
 
 
 @app.get("/paper/gold")
 def paper_gold_page():
     return render_template(
-        "paper.html", demo_only=False, stocks_demo=False, methods_demo=False, gold_demo=True)
+        "paper.html", demo_only=False, stocks_demo=False, methods_demo=False, gold_demo=True, btc_demo=False)
+
+
+@app.get("/paper/btc")
+def paper_btc_page():
+    return render_template(
+        "paper.html", demo_only=False, stocks_demo=False, methods_demo=False, gold_demo=False, btc_demo=True)
 
 
 @app.get("/paper/demo/stocks")
 def paper_demo_stocks_page():
     return render_template(
-        "paper.html", demo_only=True, stocks_demo=True, methods_demo=False, gold_demo=False)
+        "paper.html", demo_only=True, stocks_demo=True, methods_demo=False, gold_demo=False, btc_demo=False)
 
 
 @app.get("/paper/demo")
 def paper_demo_page():
     return render_template(
-        "paper.html", demo_only=True, stocks_demo=False, methods_demo=False, gold_demo=False)
+        "paper.html", demo_only=True, stocks_demo=False, methods_demo=False, gold_demo=False, btc_demo=False)
 
 
 @app.get("/healthz")
