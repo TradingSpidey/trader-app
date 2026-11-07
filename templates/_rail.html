@@ -68,6 +68,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 6.4H21l-5.4 4 2 6.6L12 16.8 6.4 20l2-6.6L3 9.4h6.8z"/></svg>
       <span>黃金紙盤</span>
     </a>
+    <a href="/paper/btc" class="{{ 'active' if request.path == '/paper/btc' else '' }}" {% if request.path == '/paper/btc' %}aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M10 8.2h4.1a2 2 0 0 1 0 4H10M10 12.2h4.5a2 2 0 0 1 0 4H10M12 6.2V8M12 16.2V18"/></svg>
+      <span>比特幣紙盤</span>
+    </a>
   </nav>
   <p class="rail-foot">模擬盤，唔係真錢，唔係投資建議</p>
 </aside>

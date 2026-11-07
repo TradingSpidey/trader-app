@@ -597,6 +597,172 @@ class PaperIngestTests(unittest.TestCase):
         self.assertEqual([b["id"] for b in kept["leaderboard_gold"]["data"]["books"]], ["G1", "G2", "G4", "G5"])
         self.assertEqual(kept["leaderboard"]["data"]["books"][0]["id"], "C0")
 
+    def test_btc_leaderboard_is_separate(self):
+        missing = self.client.post("/api/paper/ingest/leaderboard_btc", data=b"{}", content_type="application/json")
+        self.assertEqual(missing.status_code, 503)
+        os.environ["PAPER_INGEST_TOKEN"] = "correct-token"
+        headers = {"Authorization": "Bearer correct-token", "Content-Type": "application/json"}
+        no_token = self.client.post("/api/paper/ingest/leaderboard_btc", data=b"{}", content_type="application/json")
+        self.assertEqual(no_token.status_code, 401)
+        bad = self.client.post(
+            "/api/paper/ingest/leaderboard_btc", data=b"{}", headers={"Authorization": "Bearer nope"})
+        self.assertEqual(bad.status_code, 401)
+        self.assertNotIn(b"correct-token", bad.data)
+        not_list = self.client.post(
+            "/api/paper/ingest/leaderboard_btc", data=json.dumps({"books": "nope"}), headers=headers)
+        self.assertEqual(not_list.status_code, 400)
+        crypto = self.client.post(
+            "/api/paper/ingest/leaderboard",
+            data=json.dumps({"book_count": 1, "books": [{"id": "C0", "label": "crypto"}]}),
+            headers=headers)
+        self.assertEqual(crypto.status_code, 200)
+        stocks = self.client.post(
+            "/api/paper/ingest/leaderboard_stocks",
+            data=json.dumps({"market": "stocks", "book_count": 1, "books": [{"id": "S0", "label": "stock"}]}),
+            headers=headers)
+        self.assertEqual(stocks.status_code, 200)
+        methods = self.client.post(
+            "/api/paper/ingest/leaderboard_methods",
+            data=json.dumps({"matrix_id": "METHODS_V1", "book_count": 1, "books": [{"id": "M1", "label": "M1"}]}),
+            headers=headers)
+        self.assertEqual(methods.status_code, 200)
+        gold = self.client.post(
+            "/api/paper/ingest/leaderboard_gold",
+            data=json.dumps({"matrix_id": "GOLD_V1", "book_count": 1, "books": [{"id": "G1", "label": "G1"}]}),
+            headers=headers)
+        self.assertEqual(gold.status_code, 200)
+        sample = _sample("btc_leaderboard")
+        res = self.client.post(
+            "/api/paper/ingest/leaderboard_btc", data=json.dumps(sample), headers=headers)
+        self.assertEqual(res.status_code, 200)
+        body = res.get_json()
+        self.assertEqual(body["book"], "leaderboard_btc")
+        self.assertEqual(body["books"], 5)
+        paper_store.reset_memory()
+        api = self.client.get("/api/paper").get_json()
+        self.assertEqual(api["leaderboard"]["data"]["books"][0]["id"], "C0")
+        self.assertEqual(api["leaderboard_stocks"]["data"]["books"][0]["id"], "S0")
+        self.assertEqual(api["leaderboard_methods"]["data"]["books"][0]["id"], "M1")
+        self.assertEqual(api["leaderboard_gold"]["data"]["books"][0]["id"], "G1")
+        self.assertEqual(api["crypto"], None)
+        self.assertEqual(api["stocks"], None)
+        board = api["leaderboard_btc"]["data"]
+        self.assertEqual(board["matrix_id"], "BTC_V1")
+        self.assertEqual(board["symbol"], "BTCUSDT")
+        self.assertEqual(board["session"], "24/7")
+        self.assertEqual(board["start_usd"], 100.0)
+        self.assertEqual(board["disclaimer"], "模擬盤，唔係真錢，唔係投資建議")
+        books = {b["id"]: b for b in board["books"]}
+        self.assertEqual(list(books), ["B1", "B2", "B3", "B4", "B5"])
+        self.assertEqual(books["B1"]["label"], "B1 TrendMA｜均線趨勢｜BTCUSDT")
+        self.assertEqual(books["B1"]["equity_usd"], 100.0)
+        self.assertTrue(books["B1"]["live_enabled"])
+        self.assertEqual(books["B2"]["label"], "B2 MomBreak｜動量突破｜BTCUSDT")
+        self.assertEqual(books["B2"]["equity_usd"], 100.0)
+        self.assertTrue(books["B3"]["live_enabled"])
+        self.assertEqual(books["B3"]["equity_usd"], 100.0)
+        self.assertIn("MeanRev", books["B4"]["label"])
+        self.assertEqual(books["B4"]["equity_usd"], 100.0)
+        self.assertIn("WARNING", books["B4"]["warning"])
+        self.assertFalse(books["B5"]["live_enabled"])
+        self.assertEqual(books["B5"]["backtest_net_pct"], -4.54)
+        self.assertEqual(books["B5"]["backtest_max_dd_pct"], 23.36)
+        self.assertIn("TrendMASlow", books["B5"]["label"])
+        self.assertEqual(books["B1"]["positions"], 0)
+        self.assertEqual(books["B1"]["cash_usd"], 100.0)
+        page = self.client.get("/paper")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn(b'href="/paper/btc"', page.data)
+        self.assertIn(b'href="/paper/gold"', page.data)
+        self.assertIn(b'id="books"', page.data)
+        self.assertIn(b'id="funnel"', page.data)
+        self.assertIn(b'id="leaderboard"', page.data)
+        self.assertNotIn(b'id="btc"', page.data)
+        self.assertNotIn(b'id="gold"', page.data)
+        btc = self.client.get("/paper/btc")
+        self.assertEqual(btc.status_code, 200)
+        text = btc.data.decode()
+        self.assertEqual(text.count("比特幣紙盤｜BTC_V1"), 3)
+        self.assertIn("比特幣紙盤｜BTC_V1｜各 $100｜只做 BTCUSDT", text)
+        self.assertIn("只做 BTCUSDT｜Binance｜24/7｜模擬盤", text)
+        for label in (
+            "B1 TrendMA",
+            "B2 MomBreak",
+            "B3 VolBreak",
+            "B4 MeanRev",
+            "逆勢均值回歸",
+            "WARNING",
+            "B5 TrendMASlow",
+            "HOLD",
+        ):
+            self.assertIn(label, text)
+        self.assertIn("模擬盤，唔係真錢，唔係投資建議", text)
+        self.assertIn("Paper trading only. Not real money. Not investment advice.", text)
+        self.assertNotIn("。", text)
+        self.assertIn('id="btc"', text)
+        self.assertIn('data-btc="1"', text)
+        self.assertIn('href="/paper/btc" class="active"', text)
+        self.assertNotIn('id="books"', text)
+        self.assertNotIn('id="funnel"', text)
+        self.assertNotIn('id="leaderboard"', text)
+        self.assertNotIn('id="methods"', text)
+        self.assertNotIn('id="gold"', text)
+        js_path = os.path.join(os.path.dirname(__file__), "..", "static", "paper.js")
+        with open(js_path, encoding="utf-8") as fh:
+            js = fh.read()
+        self.assertIn("leaderboard_btc", js)
+        self.assertIn("btcHtml", js)
+        self.assertIn("WARNING", js)
+        self.assertIn("HOLD", js)
+        self.assertIn("只做 BTCUSDT｜Binance｜24/7｜模擬盤", js)
+        self.assertIn("逆勢均值回歸", js)
+        for label in (
+            "B1 TrendMA｜均線趨勢",
+            "B2 MomBreak｜動量突破",
+            "B3 VolBreak｜波動突破",
+            "B4 MeanRev｜均值回歸",
+            "B5 TrendMASlow｜慢均線",
+        ):
+            self.assertIn(label, js)
+        methods_page = self.client.get("/paper/methods")
+        gold_page = self.client.get("/paper/gold")
+        demo = self.client.get("/paper/demo")
+        stocks_page = self.client.get("/paper/demo/stocks")
+        desk = self.client.get("/desk")
+        self.assertEqual(methods_page.status_code, 200)
+        self.assertEqual(gold_page.status_code, 200)
+        self.assertEqual(demo.status_code, 200)
+        self.assertEqual(stocks_page.status_code, 200)
+        self.assertEqual(desk.status_code, 200)
+        self.assertIn("五方法紙盤｜METHODS_V1", methods_page.data.decode())
+        self.assertIn(b'id="methods"', methods_page.data)
+        self.assertIn(b'href="/paper/btc"', methods_page.data)
+        self.assertNotIn(b'id="btc"', methods_page.data)
+        self.assertNotIn("BTC_V1", methods_page.data.decode())
+        self.assertIn("黃金紙盤｜GOLD_V1", gold_page.data.decode())
+        self.assertIn(b'id="gold"', gold_page.data)
+        self.assertIn(b'href="/paper/btc"', gold_page.data)
+        self.assertNotIn(b'id="btc"', gold_page.data)
+        self.assertNotIn("BTC_V1", gold_page.data.decode())
+        self.assertIn("Demo 排行榜（78 本 · 角色交叉組合 V6）", demo.data.decode())
+        self.assertIn("Demo 排行榜（36 本 · 美股交叉組合 V1）", stocks_page.data.decode())
+        self.assertNotIn("BTC_V1", demo.data.decode())
+        self.assertNotIn("BTC_V1", stocks_page.data.decode())
+        self.assertNotIn(b'id="btc"', demo.data)
+        self.assertIn(b'href="/paper/btc"', desk.data)
+        slim = dict(sample)
+        slim["books"] = [b for b in sample["books"] if b["id"] != "B5"]
+        again = self.client.post(
+            "/api/paper/ingest/leaderboard_btc", data=json.dumps(slim), headers=headers)
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(again.get_json()["books"], 4)
+        paper_store.reset_memory()
+        kept = self.client.get("/api/paper").get_json()
+        self.assertEqual([b["id"] for b in kept["leaderboard_btc"]["data"]["books"]], ["B1", "B2", "B3", "B4"])
+        self.assertEqual(kept["leaderboard"]["data"]["books"][0]["id"], "C0")
+        self.assertEqual(kept["leaderboard_gold"]["data"]["books"][0]["id"], "G1")
+        self.assertEqual(kept["leaderboard_methods"]["data"]["books"][0]["id"], "M1")
+
 
 if __name__ == "__main__":
     unittest.main()
