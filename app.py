@@ -14,7 +14,12 @@ app = Flask(__name__)
 @app.after_request
 def _desk_assets_revalidate(resp):
     path = request.path or ""
-    if path == "/desk" or path.startswith("/static/desk."):
+    if (
+        path == "/desk"
+        or path.startswith("/static/desk.")
+        or path in ("/paper/v2", "/api/paper/v2")
+        or path.startswith("/static/paper-v2.")
+    ):
         resp.headers["Cache-Control"] = "no-cache, must-revalidate"
     return resp
 
@@ -204,6 +209,16 @@ def api_paper_ingest_leaderboard_btc():
     return jsonify(body), code
 
 
+@app.post("/api/paper/ingest/leaderboard_quant_v2")
+def api_paper_ingest_leaderboard_quant_v2():
+    denied = _ingest_denied()
+    if denied:
+        return denied
+    raw = request.get_data(cache=False) or b""
+    body, code = paper_store.ingest_quant_v2(raw)
+    return jsonify(body), code
+
+
 @app.post("/api/paper/ingest/<book>")
 def api_paper_ingest(book):
     denied = _ingest_denied()
@@ -217,6 +232,11 @@ def api_paper_ingest(book):
 @app.get("/api/paper")
 def api_paper():
     return jsonify(paper_store.load_all())
+
+
+@app.get("/api/paper/v2")
+def api_paper_v2():
+    return jsonify(paper_store.quant_v2_view())
 
 
 @app.get("/paper")
@@ -241,6 +261,11 @@ def paper_gold_page():
 def paper_btc_page():
     return render_template(
         "paper.html", demo_only=False, stocks_demo=False, methods_demo=False, gold_demo=False, btc_demo=True)
+
+
+@app.get("/paper/v2")
+def paper_v2_page():
+    return render_template("paper_v2.html", view=paper_store.quant_v2_view())
 
 
 @app.get("/paper/demo/stocks")

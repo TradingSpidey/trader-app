@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>QUANT_V2｜PAPER LIVE</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='14' fill='%2339ff14' font-family='monospace'%3EQ%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/paper-v2.css">
+</head>
+<body class="quant-v2">
+<a class="skip" href="#main">跳到內容</a>
+<div class="app">
+{% include "_rail.html" %}
+<main id="main" class="stage">
+  <header class="cmd-top">
+    <div class="wordmark">
+      <p class="kicker">SPIDEY</p>
+      <h1>QUANT_V2</h1>
+    </div>
+    <p class="live-badge" role="status">
+      <span class="pulse" aria-hidden="true"></span>
+      PAPER LIVE
+    </p>
+  </header>
+
+  <p class="status-line" id="status-line">PAPER LIVE · QUANT_V2 · {{ view.book.symbol }}</p>
+  <p class="stub-line">實驗 stub · 假單 · 舊 <a href="/paper">/paper</a> 仍然係主盤</p>
+  <p class="stub-en">Paper only · fake orders · not real money</p>
+
+  <ul class="pills" aria-label="層級">
+    <li class="pill forecast">Forecast</li>
+    <li class="pill risk">Risk</li>
+    <li class="pill execute">Execute</li>
+    <li class="pill stub">stub</li>
+  </ul>
+
+  <div class="split">
+    <section class="panel kpis" aria-label="模擬倉指標">
+      <article class="kpi equity">
+        <span>權益 equity</span>
+        <b class="num" id="kpi-equity">{{ '%.2f'|format(view.book.equity_usd) if view.book.equity_usd is not none else '—' }}</b>
+      </article>
+      <article class="kpi cash">
+        <span>現金 cash</span>
+        <b class="num" id="kpi-cash">{{ '%.2f'|format(view.book.cash_usd) if view.book.cash_usd is not none else '—' }}</b>
+      </article>
+      <article class="kpi score">
+        <span>分數 score</span>
+        <b class="num" id="kpi-score">{% if view.book.score is number %}{{ '%.2f'|format(view.book.score) }}{% elif view.book.score %}{{ view.book.score }}{% else %}stub{% endif %}</b>
+      </article>
+      <article class="kpi direction">
+        <span>方向 direction</span>
+        <b class="num" id="kpi-direction">{{ view.book.direction or '—' }}</b>
+        <small id="kpi-direction-zh">{% if view.book.direction in ['LONG', 'BUY'] %}做多{% elif view.book.direction in ['SHORT', 'SELL'] %}做空{% elif view.book.direction in ['FLAT', 'HOLD'] %}觀望{% endif %}</small>
+      </article>
+      <article class="kpi price">
+        <span>最新價 last price</span>
+        <b class="num" id="kpi-price">{{ '%.2f'|format(view.book.last_price) if view.book.last_price is not none else '—' }}</b>
+      </article>
+      <article class="kpi updated">
+        <span>更新 HKT</span>
+        <b class="num" id="kpi-updated">{{ view.book.updated_hkt or '—' }}</b>
+      </article>
+    </section>
+
+    <aside class="panel live-card" aria-label="假單卡">
+      <p class="live-kicker">PAPER LIVE</p>
+      <p class="live-symbol num" id="live-symbol">{{ view.book.symbol }}</p>
+      <p class="live-meta" id="live-meta">{% if view.book.venue %}{{ view.book.venue }}{% endif %}{% if view.book.interval %} · {{ view.book.interval }}{% endif %}{% if view.book.bars %} × {{ view.book.bars }}{% endif %}</p>
+      <p class="live-fake">假單 · fake order</p>
+      <p class="source" id="source-line">{% if view.source == 'ingest' %}已接收 QUANT_V2 push{% if view.received_at %} · {{ view.received_at }}{% endif %}{% else %}未收到 push，而家顯示 smoke seed{% endif %}</p>
+      <p class="back"><a href="/paper">返 $50 主盤</a></p>
+    </aside>
+  </div>
+
+  <section class="panel fills" aria-labelledby="fills-title">
+    <div class="panel-h">
+      <h2 id="fills-title">最近模擬成交</h2>
+      <p>假單 log · 唔會送去交易所</p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>時間 HKT</th>
+            <th>邊</th>
+            <th>代號</th>
+            <th>名義</th>
+            <th>價格</th>
+            <th>標記</th>
+          </tr>
+        </thead>
+        <tbody id="fills-body">
+          {% for row in view.book.fills %}
+          <tr>
+            <td class="num" data-label="時間">{{ row.ts_hkt or '—' }}</td>
+            <td class="num" data-label="邊">{% if row.side == 'BUY' %}買入 BUY{% elif row.side == 'SELL' %}賣出 SELL{% else %}{{ row.side or '—' }}{% endif %}</td>
+            <td class="num" data-label="代號">{{ row.symbol or '—' }}</td>
+            <td class="num" data-label="名義">{{ '%.2f'|format(row.notional_usd) if row.notional_usd is not none else '—' }}</td>
+            <td class="num" data-label="價格">{{ '%.2f'|format(row.price) if row.price is not none else '—' }}</td>
+            <td class="num" data-label="標記">{{ row.kind or 'smoke' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6">未有模擬成交</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel flow" aria-label="預測到執行">
+    <ol class="stepper">
+      <li>
+        <span class="node cyan">01</span>
+        <strong>預測</strong>
+        <small>Forecast</small>
+      </li>
+      <li>
+        <span class="node purple">02</span>
+        <strong>倉位</strong>
+        <small>Risk</small>
+      </li>
+      <li>
+        <span class="node green">03</span>
+        <strong>執行</strong>
+        <small>Execute</small>
+      </li>
+    </ol>
+    <p class="llm">AI／LLM 唔落單</p>
+    <p class="llm-en">AI / LLM does not place orders</p>
+  </section>
+
+  <footer class="disc" id="disclaimer">{{ view.disclaimer }}</footer>
+</main>
+</div>
+<script src="/static/paper-v2.js"></script>
+</body>
+</html>

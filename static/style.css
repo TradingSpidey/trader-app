@@ -74,6 +74,9 @@ h2 { font-size: 15px; }
 .sidebar svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .sidebar button.active, .sidebar a.active { background: #1c2633; color: var(--text); border-color: var(--line); }
 .sidebar button:hover, .sidebar a:hover { color: var(--text); background: #141b24; }
+.sidebar a.nav-secondary { color: #7e8b9c; font-weight: 500; }
+.sidebar a.nav-secondary:hover { color: #d5deea; }
+.sidebar a.nav-secondary.active { color: var(--text); font-weight: 600; }
 .rail-foot {
   margin-top: auto; color: #ffe3ad; font-size: 12px; line-height: 1.45;
   padding: 10px; border: 1px solid #3a2e16; background: #161208; border-radius: 8px;
