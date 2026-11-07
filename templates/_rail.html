@@ -72,6 +72,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M10 8.2h4.1a2 2 0 0 1 0 4H10M10 12.2h4.5a2 2 0 0 1 0 4H10M12 6.2V8M12 16.2V18"/></svg>
       <span>比特幣紙盤</span>
     </a>
+    <a href="/paper/v2" class="nav-secondary {{ 'active' if request.path == '/paper/v2' else '' }}" {% if request.path == '/paper/v2' %}aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 4v10l-7 4-7-4V7z"/><path d="M12 12l7-4M12 12v9M12 12L5 8"/></svg>
+      <span>QUANT V2（實驗）</span>
+    </a>
   </nav>
   <p class="rail-foot">模擬盤，唔係真錢，唔係投資建議</p>
 </aside>

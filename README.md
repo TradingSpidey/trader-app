@@ -77,6 +77,15 @@ curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: ap
 
 `GET /api/paper` adds `leaderboard_btc` (`null` before the first push). The page is `/paper/btc`. Live books are B1 TrendMA, B2 MomBreak, B3 VolBreak, and B4 MeanRev (WARNING). B5 TrendMASlow is shown as HOLD when `live_enabled` is false or the payload says hold. The snapshot is `PAPER_STORE_DIR/leaderboard_btc.json`.
 
+The same token accepts a parallel QUANT_V2 paper book. It does not write the crypto, stock, methods, gold, or bitcoin books. No new environment variable. This page is an experimental stub. `/paper` stays the main board.
+
+```bash
+curl -X POST -H "Authorization: Bearer $PAPER_INGEST_TOKEN" -H "Content-Type: application/json" \
+  --data-binary @quant_v2.json https://<host>/api/paper/ingest/leaderboard_quant_v2
+```
+
+`GET /api/paper` adds `leaderboard_quant_v2` (`null` before the first push). `GET /api/paper/v2` and `/paper/v2` show that push, or a built-in BTCUSDT smoke seed (equity 99.99, cash 89.99, one $10 BUY) until a push arrives. The snapshot is `PAPER_STORE_DIR/leaderboard_quant_v2.json`. A payload needs equity, cash, fills, trades, or a state object. Flat fields and a `state` / `fills` / `config` demo book both work.
+
 `/paper` renders `crypto.data.funnel` when the always-on engine includes it: Scout→Filter→Analyst→Sniper→Guard counts (`seen` / `passed` / `skipped`) and the skipped/copied event log. Those numbers are the engine's own counts. Until a funnel object arrives, the section stays on the waiting line. `/paper/demo` does not show the funnel.
 
 When the US market is closed, the app replays the latest completed session at 10:15 AM New York
